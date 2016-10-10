@@ -14,6 +14,9 @@ public class Abstractor {
     public static void main(String args[]) {
         //TODO: function to read in file and remove any whitespaces in header and save file
         // note: just cut logic from below and use it to overwrite the file then use file from there
+        // ?: are we just going to have a "prefix" file that reads in prefix each time and creates a map for usage?
+        //TODO: need to figure out how to handle prefixes and understand better how we will use w/ predicates
+        // ?: is this program going to have to call an ER API?
 
         String filename = args[0];
         String subjectprefix = args[1];
