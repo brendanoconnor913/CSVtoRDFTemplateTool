@@ -11,9 +11,7 @@ import org.apache.jena.tdb.TDBLoader;
 import org.apache.jena.util.FileManager;
 import org.javatuples.Pair;
 
-import java.io.File;
-import java.io.FileReader;
-import java.io.Reader;
+import java.io.*;
 import java.util.Scanner;
 import java.util.Vector;
 
@@ -23,6 +21,13 @@ import java.util.Vector;
 public class AttributeHandler {
     // TODO: After finding resources need to check if any meta data to return
     // TODO: Need to write a function to add any new data as triples to resource/entity
+        // generalized version of createAttribute
+    // TODO: Potentially refactor the attribute search into a function
+    public static Model model = ModelFactory.createDefaultModel();
+
+    AttributeHandler() {
+        model.read("sample.nt");
+    }
 
     public static String formatAttribute(String attr) {
         char[] symbols = {'-',','}; // symbols to be removed from attributes
@@ -42,9 +47,23 @@ public class AttributeHandler {
         }
         return sb.toString();
     }
+
+    public static void createAlias(Resource r, String alias){
+        r.addProperty(ResourceFactory.createProperty("http://umkc.edu/alias.rdf"),
+                ResourceFactory.createPlainLiteral(alias));
+        try {
+            PrintWriter pw = new PrintWriter("sample.nt");
+            model.write(pw, "N-TRIPLES");
+            pw.close();
+        }
+        catch(Exception exec) {
+            exec.printStackTrace();
+        }
+    }
+
     public static void main(String args[]) {
         try {
-
+            AttributeHandler handler = new AttributeHandler();
             // Reading in the attributes
             String filename = args[0];
             Reader in = new FileReader(filename);
@@ -61,11 +80,10 @@ public class AttributeHandler {
 
             // First attempt to identify
             Vector<Pair<String, Integer>> unidentified = new Vector<Pair<String, Integer>>();
-            Model model = ModelFactory.createDefaultModel();
-            model.read("sample.nt");
+
             for(int i = 0; i < header.size(); i++) {
                 String current = header.get(i);
-                String query = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf#> \"" + current + "\".}";
+                String query = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf> \"" + current + "\".}";
                 QueryExecution qexec = QueryExecutionFactory.create(query, model);
                 ResultSet results = qexec.execSelect();
                 if (!results.hasNext()) { // attribute not identified
@@ -83,8 +101,9 @@ public class AttributeHandler {
 
             // Get attribute name from user
             Vector<Pair<String, Integer>> input = new Vector<Pair<String,Integer>>();
-            System.out.println("The system was unable to identify the following items "+ unidentified.size()
-                    + "." + " Please enter a name after \":\" to be used to create a new resource for each item.");
+            System.out.println("\nThe system was unable to identify the following items "+ unidentified.size()
+                    + "." + "\nPlease enter a name after \":\" to be used to create a new resource for each item." +
+                    "\n (Press ENTER if you wish to keep given attribute name)");
             int number = 1;
             for(Pair<String, Integer> p : unidentified) {
                 String userin;
@@ -101,18 +120,25 @@ public class AttributeHandler {
                 number++;
             }
 
-//            // Attempt to re-identify attribute from user input
-//            for(String s : unidentified) {
-//                String query = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf#> \"" + s + "\".}";
-//                QueryExecution qexec = QueryExecutionFactory.create(query, model);
-//                ResultSet results = qexec.execSelect();
-//
-//                for( ; results.hasNext(); ) {
-//                    QuerySolution soln = results.nextSolution() ;
-//                    Resource r = soln.getResource("x");
-//                    System.out.println(r);
-//                }
-//            }
+            // Attempt to re-identify attribute from user input
+            for(int i = 0; i < input.size(); i++) {
+                String original = unidentified.get(i).getValue0();
+                String current = input.get(i).getValue0();
+                String query = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf> \"" + current + "\".}";
+                QueryExecution qexec = QueryExecutionFactory.create(query, model);
+                ResultSet results = qexec.execSelect();
+                if (!results.hasNext()) { // attribute not identified
+                    unidentified.add(new Pair<String, Integer>(current,i));
+                }
+                for( ; results.hasNext(); ) {
+                    // TODO: add resource to finalAttrs array (not sure if they may be multiple results)
+                    QuerySolution soln = results.nextSolution() ;
+                    Resource r = soln.getResource("x");
+                    createAlias(r,original);
+                    System.out.println(r + " was identified from " + current + "(originally was \""
+                        + original + "\").");
+                }
+            }
 
         }
         catch(Exception e) {
