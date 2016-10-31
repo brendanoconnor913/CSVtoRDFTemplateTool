@@ -29,6 +29,12 @@
             <version>1.1</version>
         </dependency>
 
+        <dependency>
+            <groupId>org.javatuples</groupId>
+            <artifactId>javatuples</artifactId>
+            <version>1.2</version>
+            <scope>compile</scope>
+        </dependency>
 
        <!-- &lt;!&ndash; https://mvnrepository.com/artifact/com.hp.hpl.jena/jena &ndash;&gt;
         <dependency>
