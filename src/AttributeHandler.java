@@ -12,25 +12,31 @@ import org.apache.jena.util.FileManager;
 import org.javatuples.Pair;
 
 import java.io.*;
-import java.util.Scanner;
-import java.util.Vector;
+import java.util.*;
+import java.util.concurrent.ArrayBlockingQueue;
 
 /**
  * Created by brendan on 10/30/16.
  */
 public class AttributeHandler {
-    // TODO: After finding resources need to check if any meta data to return
+    // TODO: After finding resources need to search graph for any meta data and add to attribute
     // TODO: Need to write a function to add any new data as triples to resource/entity
-        // generalized version of createAttribute
-    // TODO: Potentially refactor the attribute search into a function
-    public static Model model = ModelFactory.createDefaultModel();
 
-    AttributeHandler() {
-        model.read("sample.nt");
+    private Vector<Attribute> attributes;
+    private Model model = ModelFactory.createDefaultModel();
+    private Vector<String> header;
+    private String filename;
+
+    AttributeHandler(Vector<String> header, String graph) {
+        filename = graph;
+        model.read(filename);
+        this.header = header;
+        attributes = new Vector<Attribute>(header.size());
     }
 
-    public static String formatAttribute(String attr) {
-        char[] symbols = {'-',','}; // symbols to be removed from attributes
+    // takes in column header and puts in uniform format
+    private static String formatAttribute(String attr) {
+        char[] symbols = {'-',','};// symbols to be removed from attributes
         StringBuilder sb = new StringBuilder();
         // remove symbols, spaces -> _ , and convert to all lower case
         for(char c : attr.toCharArray()) {
@@ -48,11 +54,10 @@ public class AttributeHandler {
         return sb.toString();
     }
 
-    public static void createAlias(Resource r, String alias){
-        r.addProperty(ResourceFactory.createProperty("http://umkc.edu/alias.rdf"),
-                ResourceFactory.createPlainLiteral(alias));
+    // Output changes to model file
+    private void writeToModel() {
         try {
-            PrintWriter pw = new PrintWriter("sample.nt");
+            PrintWriter pw = new PrintWriter(filename);
             model.write(pw, "N-TRIPLES");
             pw.close();
         }
@@ -61,87 +66,115 @@ public class AttributeHandler {
         }
     }
 
-    public static void main(String args[]) {
+    // adds an alias to existing metagraph
+    private void createAlias(Resource r, String alias){
+        r.addProperty(ResourceFactory.createProperty("http://umkc.edu/alias.rdf"),
+                ResourceFactory.createPlainLiteral(alias));
+        writeToModel();
+    }
+
+    // Create new entity and add to graph
+    private Resource createEntity(String name){
+        // Capitalize the first letter then create as entity
+        char[] modname = name.toCharArray();
+        modname[0] = Character.toUpperCase(modname[0]);
+        String frname = new String(modname);
+        String rname = "http://umkc.edu/resource/"+frname;
+        Resource r = model.createResource(rname);
+        r.addProperty(ResourceFactory.createProperty("http://umkc.edu/alias.rdf"),
+                ResourceFactory.createPlainLiteral(name));
+        writeToModel();
+        return r;
+    }
+
+    private String getAttributeInput(String unidentified) {
+        System.out.println("\nThe system was unable to identify" + unidentified +
+                "\n (Press ENTER if you wish to keep given attribute name)");
+        String userin;
+        System.out.print(unidentified + " : ");
+        Scanner s = new Scanner(System.in);
+        String line = s.nextLine().trim();
+        if(line.equals("")) { // if enter inputted use old attribute
+            userin = unidentified;
+        }
+        else {
+            userin = formatAttribute(line);
+        }
+        return userin;
+    }
+
+    // Searches metagraph to try and find attribute if not found asks for user input for other possible alias
+    // if found attaches new and old alias to resource if not creates new alias
+    public Vector<Attribute> findAttributes() {
         try {
-            AttributeHandler handler = new AttributeHandler();
-            // Reading in the attributes
-            String filename = args[0];
-            Reader in = new FileReader(filename);
-            Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
-            CSVRecord headerRecord = recordForHeader.iterator().next();
-            Vector<String> header = new Vector();
-            for(int i = 0; i < headerRecord.size(); i++) {
-                String s = formatAttribute(headerRecord.get(i).trim());
-                header.add(s);
-            }
-
-            // Array to store final attributes used to construct quads
-            String[] finalAttrs = new String[headerRecord.size()];
-
-            // First attempt to identify
-            Vector<Pair<String, Integer>> unidentified = new Vector<Pair<String, Integer>>();
-
             for(int i = 0; i < header.size(); i++) {
                 String current = header.get(i);
                 String query = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf> \"" + current + "\".}";
                 QueryExecution qexec = QueryExecutionFactory.create(query, model);
                 ResultSet results = qexec.execSelect();
                 if (!results.hasNext()) { // attribute not identified
-                    System.out.println("Resource for " + current +
-                            " was not found.");
-                    unidentified.add(new Pair<String, Integer>(current,i));
+                    String in = getAttributeInput(current); // get new attribute name and search again
+                    String secondsearch = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf> \"" + in + "\".}";
+                    QueryExecution qex = QueryExecutionFactory.create(secondsearch, model);
+                    ResultSet sndresult = qex.execSelect();
+                    if (!sndresult.hasNext()) { // attribute not identified
+                        Resource nr = createEntity(in);
+                        createAlias(nr,current);
+                        attributes.add(new Attribute(nr));
+                    }
+                    int rescnt = 0;
+                    for( ; results.hasNext(); ) {
+                        if(rescnt > 0) { // multiple results returned for alias name
+                            throw new Exception("Ambigious alias (alias found under multiple resources" +
+                                    " please remove duplicate before continuing.");
+                        }
+                        QuerySolution soln = results.nextSolution() ;
+                        Resource r = soln.getResource("x");
+                        createAlias(r,current);
+                        System.out.println(r + " was identified from " + in + "(originally was \""
+                                + current + "\").");
+                        attributes.add(new Attribute(r));
+                        rescnt++;
+                    }
                 }
-                for( ; results.hasNext(); ) {
-                    // TODO: add resource to finalAttrs array (not sure if they may be multiple results)
-                    QuerySolution soln = results.nextSolution() ;
-                    Resource r = soln.getResource("x");
-                    System.out.println(r);
-                }
-            }
-
-            // Get attribute name from user
-            Vector<Pair<String, Integer>> input = new Vector<Pair<String,Integer>>();
-            System.out.println("\nThe system was unable to identify the following items "+ unidentified.size()
-                    + "." + "\nPlease enter a name after \":\" to be used to create a new resource for each item." +
-                    "\n (Press ENTER if you wish to keep given attribute name)");
-            int number = 1;
-            for(Pair<String, Integer> p : unidentified) {
-                String userin;
-                System.out.print(number + ". " + p.getValue0() + " : ");
-                Scanner s = new Scanner(System.in);
-                String line = s.nextLine().trim();
-                if(line.equals("")) { // if enter inputted use old attribute
-                    userin = p.getValue0();
-                }
-                else {
-                    userin = formatAttribute(line);
-                }
-                input.add(new Pair<String, Integer>(userin, p.getValue1()));
-                number++;
-            }
-
-            // Attempt to re-identify attribute from user input
-            for(int i = 0; i < input.size(); i++) {
-                String original = unidentified.get(i).getValue0();
-                String current = input.get(i).getValue0();
-                String query = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf> \"" + current + "\".}";
-                QueryExecution qexec = QueryExecutionFactory.create(query, model);
-                ResultSet results = qexec.execSelect();
-                if (!results.hasNext()) { // attribute not identified
-                    unidentified.add(new Pair<String, Integer>(current,i));
-                }
-                for( ; results.hasNext(); ) {
-                    // TODO: add resource to finalAttrs array (not sure if they may be multiple results)
-                    QuerySolution soln = results.nextSolution() ;
-                    Resource r = soln.getResource("x");
-                    createAlias(r,original);
-                    System.out.println(r + " was identified from " + current + "(originally was \""
-                        + original + "\").");
+                else { // alias found on first try
+                    int rescnt = 0;
+                    for( ; results.hasNext(); ) {
+                        if(rescnt > 0) { // multiple results returned for alias name
+                            throw new Exception("Ambigious alias (alias found under multiple resources" +
+                                    " please remove duplicate before continuing.");
+                        }
+                        QuerySolution soln = results.nextSolution() ;
+                        Resource r = soln.getResource("x");
+                        attributes.add(new Attribute(r));
+                        System.out.println(r);
+                        rescnt++;
+                    }
                 }
             }
-
         }
         catch(Exception e) {
+            e.printStackTrace();
+        }
+        return attributes;
+    }
+
+    public static void main(String args[]) {
+        // Reading in the attributes this will be done in the abstractor
+        try {
+            Reader in = new FileReader(args[0]);
+            Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
+            CSVRecord headerRecord = recordForHeader.iterator().next();
+            Vector<String> header = new Vector<String>();
+            for(int i = 0; i < headerRecord.size(); i++) {
+                String s = formatAttribute(headerRecord.get(i).trim());
+                header.add(s);
+            }
+
+            AttributeHandler ah = new AttributeHandler(header,"sample.nt");
+
+        }
+        catch (Exception e) {
             e.printStackTrace();
         }
     }
