@@ -15,7 +15,7 @@ import org.json.*;
  * Created by brendan on 11/14/16.
  */
 public class APICall {
-    //TODO: have working version of APIcall to conceptnet
+
     boolean isPresent(JSONArray ja, String pred, String obj) {
         boolean present = false;
         for(int i = 0; i < ja.length(); i++) {

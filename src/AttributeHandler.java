@@ -20,7 +20,11 @@ import java.util.concurrent.ArrayBlockingQueue;
  */
 public class AttributeHandler {
     // TODO: After finding resources need to search graph for any meta data and add to attribute
-    // TODO: Need to write a function to add any new data as triples to resource/entity
+    // TODO: Likely will have to get input regarding "unit problem"
+        // unit is either in a nearby column or assumed in attribute
+        // will this even been in the attribute portion or will I have to do it in abstractor?
+            // I get the sense I would have to do this every time since the unit can vary on the same
+            // attribute from data set to data set
 
     private Vector<Attribute> attributes;
     private Model model = ModelFactory.createDefaultModel();
@@ -66,11 +70,16 @@ public class AttributeHandler {
         }
     }
 
+    // adds pred,obj to subj and store in graph
+    private void createTriple(Resource r, String predicate, String object){
+        r.addProperty(ResourceFactory.createProperty(predicate),
+                ResourceFactory.createPlainLiteral(object));
+        writeToModel();
+    }
+
     // adds an alias to existing metagraph
     private void createAlias(Resource r, String alias){
-        r.addProperty(ResourceFactory.createProperty("http://umkc.edu/alias.rdf"),
-                ResourceFactory.createPlainLiteral(alias));
-        writeToModel();
+        createTriple(r,"http://umkc.edu/alias.rdf",alias);
     }
 
     // Create new entity and add to graph
@@ -88,8 +97,8 @@ public class AttributeHandler {
     }
 
     private String getAttributeInput(String unidentified) {
-        System.out.println("\nThe system was unable to identify" + unidentified +
-                "\n (Press ENTER if you wish to keep given attribute name)");
+        System.out.println("\nThe system was unable to identify \"" + unidentified +
+                "\"\n\t(Press ENTER if you wish to keep given attribute name)");
         String userin;
         System.out.print(unidentified + " : ");
         Scanner s = new Scanner(System.in);
@@ -172,7 +181,6 @@ public class AttributeHandler {
             }
 
             AttributeHandler ah = new AttributeHandler(header,"sample.nt");
-
         }
         catch (Exception e) {
             e.printStackTrace();
