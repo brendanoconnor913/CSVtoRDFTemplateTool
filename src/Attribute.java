@@ -11,6 +11,7 @@ import java.util.Vector;
 public class Attribute {
     public Resource resource;
     public Map<String, String> metadata = new HashMap<String, String>();
+    public Integer unitcol = -1;
     Attribute(Resource r) {
         resource = r;
     }

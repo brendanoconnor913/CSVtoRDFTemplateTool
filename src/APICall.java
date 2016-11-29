@@ -4,11 +4,8 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.DefaultHttpClient;
 
 import java.io.BufferedReader;
-import java.io.DataOutputStream;
-import java.io.InputStream;
 import java.io.InputStreamReader;
-import java.net.HttpURLConnection;
-import java.net.URL;
+
 import org.json.*;
 
 /**
@@ -16,14 +13,14 @@ import org.json.*;
  */
 public class APICall {
 
-    boolean isPresent(JSONArray ja, String pred, String obj) {
+    // function that checks for the presence of pred-obj in given json array
+    public static boolean isPresent(JSONArray ja, String pred, String obj) {
         boolean present = false;
         for(int i = 0; i < ja.length(); i++) {
             JSONObject jo = (JSONObject)ja.get(i);
             if(jo.get("rel").equals(pred)){
                 String end = jo.get("end").toString();
                 if(end.contains(obj)){
-                    System.out.println(jo.get("end"));
                     present = true;
                 }
             }
@@ -31,7 +28,9 @@ public class APICall {
         return present;
     }
 
-    public void callConceptNet(String object) {
+    // function that calls concept net and returns a bool based on prescence of key words that indicate
+    // object given is a measurement
+    public static boolean isMeasurement(String object) {
         try {
 
             String url = "http://conceptnet5.media.mit.edu/data/5.3/c/en/"+object;
@@ -44,10 +43,6 @@ public class APICall {
 
             HttpResponse response = client.execute(request);
 
-            System.out.println("\nSending 'GET' request to URL : " + url);
-            System.out.println("Response Code : " +
-                    response.getStatusLine().getStatusCode());
-
             BufferedReader rd = new BufferedReader(
                     new InputStreamReader(response.getEntity().getContent()));
 
@@ -58,15 +53,24 @@ public class APICall {
             }
             JSONObject job = new JSONObject(result.toString());
             JSONArray jsarray = job.getJSONArray("edges");
-            System.out.println(isPresent(jsarray,"/r/IsA","measurement"));
+            // check for multiple words
+            boolean a = isPresent(jsarray,"/r/IsA","measurement");
+            boolean b = isPresent(jsarray,"/r/RelatedTo","measurement");
+            boolean c = isPresent(jsarray,"/r/RelatedTo","count");
+            boolean d = isPresent(jsarray,"/r/RelatedTo","quantity");
+            boolean isMeasurement =  a || b || c || d;
+            return isMeasurement;
         }
         catch(Exception e) {
             e.printStackTrace();
         }
+        return false;
     }
 
-    public static void main(String args[]) {
-        APICall ac = new APICall();
-        ac.callConceptNet("time");
-    }
+//    public static void main(String args[]) {
+//        APICall ac = new APICall();
+//        AttributeHandler ah = new AttributeHandler();
+//        String test = ah.formatAttribute("yard");
+//        System.out.print(ac.isMeasurement(test));
+//    }
 }

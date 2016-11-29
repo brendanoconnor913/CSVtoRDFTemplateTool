@@ -15,13 +15,11 @@ public class Abstractor {
         //TODO: function to read in file and remove any whitespaces in header and save file
         // note: just cut logic from below and use it to overwrite the file then use file from there
         // ?: are we just going to have a "prefix" file that reads in prefix each time and creates a map for usage?
-        //TODO: need to figure out how to handle prefixes and understand better how we will use w/ predicates
-        // ?: is this program going to have to call an ER API?
-        //TODO: refactor getting head names into function
+        // TODO: need to figure out how to handle prefixes and understand better how we will use w/ predicates
+        // TODO: refactor getting head names into function
         // TODO: Not sure if I should ask about context/graph info to make quads here or worry about later (I think worry about later)
         // TODO: but may make sense to get that information up front and pass it to the quad creator script
         // TODO: Also need to think about handling values with empty/null and not creating a triple from them
-
 
         String filename = args[0];
         String subjectprefix = args[1];

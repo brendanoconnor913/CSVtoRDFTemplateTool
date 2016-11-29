@@ -5,52 +5,34 @@ import org.apache.jena.atlas.io.CharStream;
 import org.apache.jena.graph.Triple;
 import org.apache.jena.query.*;
 import org.apache.jena.rdf.model.*;
-import org.apache.jena.sparql.core.Var;
-import org.apache.jena.tdb.TDBFactory;
-import org.apache.jena.tdb.TDBLoader;
-import org.apache.jena.util.FileManager;
-import org.javatuples.Pair;
-
 import java.io.*;
 import java.util.*;
-import java.util.concurrent.ArrayBlockingQueue;
+import java.util.Vector;
 
 /**
  * Created by brendan on 10/30/16.
  */
 public class AttributeHandler {
-    // TODO: After finding resources need to search graph for any meta data and add to attribute
-    // TODO: Likely will have to get input regarding "unit problem"
-        // unit is either in a nearby column or assumed in attribute
-        // will this even been in the attribute portion or will I have to do it in abstractor?
-            // I get the sense I would have to do this every time since the unit can vary on the same
-            // attribute from data set to data set
-
-    private Vector<Attribute> attributes;
     private Model model = ModelFactory.createDefaultModel();
-    private Vector<String> header;
     private String filename;
 
-    AttributeHandler(Vector<String> header, String graph) {
+    AttributeHandler(String graph) {
         filename = graph;
         model.read(filename);
-        this.header = header;
-        attributes = new Vector<Attribute>(header.size());
     }
 
     // takes in column header and puts in uniform format
-    private static String formatAttribute(String attr) {
-        char[] symbols = {'-',','};// symbols to be removed from attributes
+    public static String formatAttribute(String attr) {
+        char[] symbols = {' ','-',',','<','>','%','(',')','/','\\'};// symbols to be removed from attributes
         StringBuilder sb = new StringBuilder();
         // remove symbols, spaces -> _ , and convert to all lower case
         for(char c : attr.toCharArray()) {
-            if(c == ' ') {
+            if(ArrayUtils.contains(symbols, c)) {
                 char prev = sb.charAt(sb.length()-1);
                 if(prev != '_') {
                     sb.append('_');
                 }
             }
-            else if (ArrayUtils.contains(symbols, c)) continue;
             else {
                 sb.append(Character.toLowerCase(c));
             }
@@ -114,7 +96,8 @@ public class AttributeHandler {
 
     // Searches metagraph to try and find attribute if not found asks for user input for other possible alias
     // if found attaches new and old alias to resource if not creates new alias
-    public Vector<Attribute> findAttributes() {
+    public Vector<Attribute> findAttributes(Vector<String> header) {
+        Vector<Attribute> attributes = new Vector<Attribute>(header.size());
         try {
             for(int i = 0; i < header.size(); i++) {
                 String current = header.get(i);
@@ -131,19 +114,21 @@ public class AttributeHandler {
                         createAlias(nr,current);
                         attributes.add(new Attribute(nr));
                     }
-                    int rescnt = 0;
-                    for( ; results.hasNext(); ) {
-                        if(rescnt > 0) { // multiple results returned for alias name
-                            throw new Exception("Ambigious alias (alias found under multiple resources" +
-                                    " please remove duplicate before continuing.");
+                    else {
+                        int rescnt = 0;
+                        for( ; sndresult.hasNext(); ) {
+                            if(rescnt > 0) { // multiple results returned for alias name
+                                throw new Exception("Ambigious alias (alias found under multiple resources" +
+                                        " please remove duplicate before continuing.");
+                            }
+                            QuerySolution soln = sndresult.nextSolution() ;
+                            Resource r = soln.getResource("x");
+                            createAlias(r,current);
+                            System.out.println(r + " was identified from " + in + "(originally was \""
+                                    + current + "\").");
+                            attributes.add(new Attribute(r));
+                            rescnt++;
                         }
-                        QuerySolution soln = results.nextSolution() ;
-                        Resource r = soln.getResource("x");
-                        createAlias(r,current);
-                        System.out.println(r + " was identified from " + in + "(originally was \""
-                                + current + "\").");
-                        attributes.add(new Attribute(r));
-                        rescnt++;
                     }
                 }
                 else { // alias found on first try
@@ -168,6 +153,91 @@ public class AttributeHandler {
         return attributes;
     }
 
+    private Vector<Attribute> checkDependency(Vector<String> header, Vector<Attribute> attributes) throws Exception {
+        if(header.size() != attributes.size()){
+            throw new Exception("Header size needs to match attribute size... attribute may have been" +
+                    " lost in process");
+        }
+        Vector<Attribute> dAttributes = (Vector<Attribute>)attributes.clone();
+
+
+        for(int i = 0; i < header.size(); i++) {
+            String s = header.get(i).trim();
+            System.out.println(i + " : " + s);
+        }
+        System.out.println("\nPlease indicate if any column specifies the unit of measurement for another column");
+        System.out.println("If there aren't any unit columns simply press enter");
+        System.out.println("The format to do so is \"UNIT_COL_NUM,MEASURE_COL_NUM:" +
+                "UNIT_COL2,MEASURE_COL2:UNIT_COL3,MEASURE_COL3\"\n");
+        System.out.print("Enter dependencies as instructed above: ");
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        String line = br.readLine().trim();
+        if(!line.equals("")) {
+            String[] dependencies = line.split(":");
+            if(!dependencies[0].equals("")){
+                for(int i = 0; i < dependencies.length; i++){
+                    String [] pair = dependencies[i].split(",");
+                    if(!pair[0].equals("")) {
+                        if(pair.length != 2) {
+                            System.out.println(pair.length);
+                            System.out.println("\""+pair[0]+"\"");
+                            throw new Exception("Columns did not adhere to format given.");
+                        }
+                        Integer unit = Integer.parseInt(pair[0].trim());
+                        Integer col = Integer.parseInt(pair[1].trim());
+                        Attribute a = dAttributes.get(col);
+                        a.unitcol = unit;
+                        a.metadata.put("Unit", "DEPENDENCY");
+                    }
+                }
+            }
+        }
+        return dAttributes;
+    }
+
+    private Boolean isResourceAMeasurement(Resource r) {
+        Boolean isMes = false;
+        String query = "SELECT ?x WHERE { <"+r.toString()+"> <http://umkc.edu/alias.rdf> ?x .}";
+        QueryExecution qexec = QueryExecutionFactory.create(query, model);
+        ResultSet results = qexec.execSelect();
+        for( ; results.hasNext(); ) {
+            QuerySolution soln = results.nextSolution() ;
+            Boolean m = APICall.isMeasurement(soln.getLiteral("x").toString());
+            isMes = isMes || m;
+        }
+        return isMes;
+    }
+
+    public Vector<Attribute> getUnits(Vector<String> header, Vector<Attribute> attributes) {
+        Vector<Attribute> attrsWithUnits = new Vector<Attribute>(attributes.size());
+        try {
+            Vector<Attribute> tmp = checkDependency(header,attributes);
+            for(int i = 0; i < tmp.size();i++) {
+                Attribute a = tmp.get(i);
+                if(a.unitcol.equals(-1)) {
+                    Boolean measurement = isResourceAMeasurement(a.resource);
+                    if(i % 7 == 0) {
+                        System.out.print("\n");
+                    }
+                    System.out.print("Col " + i + " processed, ");
+                    if(measurement) { // Gets unit from user, adds to graph and attribute
+                        System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
+                        System.out.print("Please enter the unit name: ");
+                        Scanner s = new Scanner(System.in);
+                        String unit = formatAttribute(s.nextLine().trim());
+                        createTriple(a.resource, "http://umkc.edu/unit.rdf", unit);
+                        a.metadata.put("Unit", unit);
+                    }
+                }
+            }
+        }
+        catch(Exception e) {
+            e.printStackTrace();
+        }
+        return attrsWithUnits;
+    }
+
+
     public static void main(String args[]) {
         // Reading in the attributes this will be done in the abstractor
         try {
@@ -179,8 +249,13 @@ public class AttributeHandler {
                 String s = formatAttribute(headerRecord.get(i).trim());
                 header.add(s);
             }
+            header.add("yard");
 
-            AttributeHandler ah = new AttributeHandler(header,"sample.nt");
+            AttributeHandler ah = new AttributeHandler("sample.nt");
+            Vector<Attribute> aMeta = ah.getUnits(header, ah.findAttributes(header));
+//            for(Attribute a : aMeta) {
+//                System.out.println(a.unitcol);
+//            }
         }
         catch (Exception e) {
             e.printStackTrace();
