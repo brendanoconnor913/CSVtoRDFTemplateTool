@@ -153,13 +153,14 @@ public class AttributeHandler {
         return attributes;
     }
 
+    // Get input to identify if column unit dependant on another column
     private Vector<Attribute> checkDependency(Vector<String> header, Vector<Attribute> attributes) throws Exception {
         if(header.size() != attributes.size()){
             throw new Exception("Header size needs to match attribute size... attribute may have been" +
                     " lost in process");
         }
+        // Store updates in dAttributes to be returned at the end
         Vector<Attribute> dAttributes = (Vector<Attribute>)attributes.clone();
-
 
         for(int i = 0; i < header.size(); i++) {
             String s = header.get(i).trim();
@@ -192,9 +193,18 @@ public class AttributeHandler {
                 }
             }
         }
+        // if there are unit attributes update metadata to indicate it is a unit
+        for(int i = 0; i < dAttributes.size(); i++) {
+            Integer uc = dAttributes.get(i).unitcol;
+            if(!(uc.equals(Attribute.NOUNIT) || uc.equals(Attribute.ISUNIT))){
+                dAttributes.get(uc).unitcol = Attribute.ISUNIT;
+                dAttributes.get(uc).metadata.put("Unit", "TRUE");
+            }
+        }
         return dAttributes;
     }
 
+    // Calls API to attempt to indetify if attribute is a quantity
     private Boolean isResourceAMeasurement(Resource r) {
         Boolean isMes = false;
         String query = "SELECT ?x WHERE { <"+r.toString()+"> <http://umkc.edu/alias.rdf> ?x .}";
@@ -208,18 +218,15 @@ public class AttributeHandler {
         return isMes;
     }
 
+    // function to get name of unit if measurement indentified for attribute
     public Vector<Attribute> getUnits(Vector<String> header, Vector<Attribute> attributes) {
         Vector<Attribute> attrsWithUnits = new Vector<Attribute>(attributes.size());
         try {
             Vector<Attribute> tmp = checkDependency(header,attributes);
-            for(int i = 0; i < tmp.size();i++) {
+            for(int i = 0; i < tmp.size(); i++) {
                 Attribute a = tmp.get(i);
                 if(a.unitcol.equals(-1)) {
                     Boolean measurement = isResourceAMeasurement(a.resource);
-                    if(i % 7 == 0) {
-                        System.out.print("\n");
-                    }
-                    System.out.print("Col " + i + " processed, ");
                     if(measurement) { // Gets unit from user, adds to graph and attribute
                         System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
                         System.out.print("Please enter the unit name: ");
@@ -228,7 +235,9 @@ public class AttributeHandler {
                         createTriple(a.resource, "http://umkc.edu/unit.rdf", unit);
                         a.metadata.put("Unit", unit);
                     }
+                    System.out.print("Col " + i + " processed\n");
                 }
+                attrsWithUnits.add(a);
             }
         }
         catch(Exception e) {
@@ -237,28 +246,27 @@ public class AttributeHandler {
         return attrsWithUnits;
     }
 
-
-    public static void main(String args[]) {
-        // Reading in the attributes this will be done in the abstractor
-        try {
-            Reader in = new FileReader(args[0]);
-            Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
-            CSVRecord headerRecord = recordForHeader.iterator().next();
-            Vector<String> header = new Vector<String>();
-            for(int i = 0; i < headerRecord.size(); i++) {
-                String s = formatAttribute(headerRecord.get(i).trim());
-                header.add(s);
-            }
-            header.add("yard");
-
-            AttributeHandler ah = new AttributeHandler("sample.nt");
-            Vector<Attribute> aMeta = ah.getUnits(header, ah.findAttributes(header));
-//            for(Attribute a : aMeta) {
-//                System.out.println(a.unitcol);
+//    public static void main(String args[]) {
+//        // Reading in the attributes this will be done in the abstractor
+//        try {
+//            Reader in = new FileReader(args[0]);
+//            Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
+//            CSVRecord headerRecord = recordForHeader.iterator().next();
+//            Vector<String> header = new Vector<String>();
+//            for(int i = 0; i < headerRecord.size(); i++) {
+//                String s = formatAttribute(headerRecord.get(i).trim());
+//                header.add(s);
 //            }
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
+//            header.add("yard");
+//
+//            AttributeHandler ah = new AttributeHandler("sample.nt");
+//            Vector<Attribute> aMeta = ah.getUnits(header, ah.findAttributes(header));
+//            for(Attribute a : aMeta) {
+//                System.out.println("Unit col: " +a.unitcol + "\n");
+//            }
+//        }
+//        catch (Exception e) {
+//            e.printStackTrace();
+//        }
+//    }
 }
