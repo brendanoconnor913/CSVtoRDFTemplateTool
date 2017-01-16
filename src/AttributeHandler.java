@@ -44,7 +44,7 @@ public class AttributeHandler {
     private void writeToModel() {
         try {
             PrintWriter pw = new PrintWriter(filename);
-            model.write(pw, "N-TRIPLES");
+            model.write(pw, "TTL");
             pw.close();
         }
         catch(Exception exec) {

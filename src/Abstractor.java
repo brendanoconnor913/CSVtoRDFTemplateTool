@@ -1,10 +1,7 @@
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 
-import java.io.BufferedReader;
-import java.io.FileReader;
-import java.io.InputStreamReader;
-import java.io.Reader;
+import java.io.*;
 import java.util.Vector;
 
 /**
@@ -29,19 +26,15 @@ public class Abstractor {
     }
 
     public static void main(String args[]) {
-        // TODO: need to figure out how to handle prefixes and understand better how we will use w/ predicates
-        // TODO: Need to get input on context name
-        // TODO: Also need to think about handling values with empty/null and not creating a triple from them
-            // would be handled in quad creation file
         // TODO: after flow is working go back through and work on quality of triples created
-
+        // For some reason template handles empty strings by inputting a random seq of alphanum chars
         String filename = args[0];
         String graphname = args[1];
-        String context = args[2];
+        String context = args[2]; // for quad creation
         try {
-//            Vector<String> header = getHeader(filename);
-//            AttributeHandler ah = new AttributeHandler(graphname);
-//            Vector<Attribute> aMeta = ah.getUnits(header, ah.findAttributes(header));
+            Vector<String> tmpheader = getHeader(filename);
+            AttributeHandler ah = new AttributeHandler(graphname);
+            Vector<Attribute> aMeta = ah.getUnits(tmpheader, ah.findAttributes(tmpheader));
 
             Reader in = new FileReader(filename);
             Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
@@ -55,13 +48,15 @@ public class Abstractor {
 
             // get subject column index
             // if multi indices then separate by a space
-            System.out.print("Enter subject column(s) (in the order you wish for them to appear): ");
+            System.out.print("Enter subject column: ");
             BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
             String[] subjectColIndexs = br.readLine().split(" ");
             Vector<Integer> subjects = new Vector();
             StringBuilder subject = new StringBuilder();
+            int num = -1; // for subj col
+            String subj = ""; // for subject string
             for(String subCol : subjectColIndexs) {
-                int num = Integer.parseInt(subCol);
+                num = Integer.parseInt(subCol);
                 // make sure in range
                 if(num < 0 || num >= headerRecord.size()) {
                     throw new Exception ("Outside of column index range");
@@ -78,11 +73,21 @@ public class Abstractor {
                     }
                     subLit = sb.toString();
                 }
-                subject.append("${" + subLit + "}" + "-");
+                subj = "<http://umkc.edu/subject#${" + subLit + "}>";
+                subject.append(subj + " <http://rdf/label> <" + aMeta.get(num).resource + "> .\n");
             }
-            subject.deleteCharAt(subject.length()-1); // final subject string
-            System.out.println("Resulting Subject: " + subject.toString());
+            for(int i = 0; i < aMeta.size(); i++) {
+                if (i == num) { // modify if mult subj cols
+                    continue;
+                }
+                subject.append(subj + " <" + aMeta.get(i).resource + "> \"${" + headerRecord.get(i).trim() + "}\" .\n");
+            }
 
+            // TODO: after string construction working properly output to file
+            PrintStream out = new PrintStream(new FileOutputStream("triptemp.nt"));
+            System.setOut(out);
+            System.out.print(subject.toString());
+            out.close();
             in.close();
         }
         catch(Exception e) {
