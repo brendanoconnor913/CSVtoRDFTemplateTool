@@ -74,8 +74,9 @@ public class Abstractor {
             String[] subjectColIndexs = br.readLine().split(" ");
             Vector<Integer> subjects = new Vector();
             StringBuilder subject = new StringBuilder();
+            subject.append("<http://umkc.edu/subject/");
             for(String subCol : subjectColIndexs) {
-                Integer num = Integer.parseInt(subCol);
+                int num = Integer.parseInt(subCol);
                 // make sure in range
                 if(num < 0 || num >= headerRecord.size()) {
                     throw new Exception ("Outside of column index range");
@@ -92,9 +93,14 @@ public class Abstractor {
 //                    }
 //                    subLit = sb.toString();
 //                }
-                // Create subject and first triple
-                subj = "<http://umkc.edu/subject#${" + subLit + "}>";
-                subject.append(subj + " <http://rdf/label> <" + aMeta.get(num).resource + "> .\n");
+                subject.append("${" + header.get(num) + "}" + "-");
+            }
+            subject.deleteCharAt(subject.length()-1); // final subject string
+            subject.append(">");
+
+            StringBuilder allTrips = new StringBuilder();
+            for (Integer n : subjects) {
+                allTrips.append(subject.toString() + " <http://rdf/label> <" + aMeta.get(n).resource + "> .\n");
             }
 
             for (int i = 0; i < aMeta.size(); i++) {
@@ -104,16 +110,16 @@ public class Abstractor {
                 }
                 // add any anonymous node for metadata
                 else if (a.hasMetaData()) {
-                    subject.append(subj + " <" + a.resource + "> _:metadata" + i +" .\n");
-                    subject.append("_:metadata" + i + " <" + a.resource +
+                    allTrips.append(subject.toString() + " <" + a.resource + "> _:metadata" + i +" .\n");
+                    allTrips.append("_:metadata" + i + " <" + a.resource +
                             "> \"${" + headerRecord.get(i).trim() + "}\" .\n");
                     for (String k : a.metadata.keySet()) {
-                        subject.append("_:metadata" + i + " <" + k + "> \"" + a.metadata.get(k) +
+                        allTrips.append("_:metadata" + i + " <" + k + "> \"" + a.metadata.get(k) +
                                 "\" .\n");
                     }
                 }
                 else {
-                    subject.append(subj + " <" + a.resource + "> \"${" +
+                    allTrips.append(subject.toString() + " <" + a.resource + "> \"${" +
                             headerRecord.get(i).trim() + "}\" .\n");
                 }
             }
@@ -121,7 +127,7 @@ public class Abstractor {
             // Outputs created template to file
             PrintStream out = new PrintStream(new FileOutputStream("triptemp.nt"));
             System.setOut(out);
-            System.out.print(subject.toString());
+            System.out.print(allTrips.toString());
             out.close();
             in.close();
         }
