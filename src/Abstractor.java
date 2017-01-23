@@ -9,7 +9,7 @@ import java.util.Vector;
  */
 public class Abstractor {
     // function to return vector containing header for each column
-    private static Vector<String> getHeader(String fname) {
+    private static Vector<String> getFormattedHeader(String fname) {
         Vector<String> header = new Vector<String>();
         try {
             Reader in = new FileReader(fname);
@@ -26,16 +26,35 @@ public class Abstractor {
         return header;
     }
 
+    private static Vector<String> getHeader(String fname) {
+        Vector<String> header = new Vector<String>();
+        try {
+            Reader in = new FileReader(fname);
+            Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
+            CSVRecord headerRecord = recordForHeader.iterator().next();
+            for(int i = 0; i < headerRecord.size(); i++) {
+                String s = headerRecord.get(i).trim();
+                header.add(s);
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+        return header;
+    }
+
     public static void main(String args[]) {
         // TODO: after flow is working go back through and work on quality of triples created
+
         String filename = args[0];
         String graphname = args[1];
         String context = args[2]; // for quad creation
         try {
             // process column headers (map to resources and gather metadata)
-            Vector<String> tmpheader = getHeader(filename);
+            Vector<String> tmpheader = getFormattedHeader(filename);
+            Vector<String> rawHeader = getHeader(filename);
             AttributeHandler ah = new AttributeHandler(graphname);
-            Vector<Attribute> aMeta = ah.getUnits(tmpheader, ah.findAttributes(tmpheader));
+            Vector<Attribute> aMeta = ah.getUnits(rawHeader, tmpheader, ah.findAttributes(tmpheader));
 
             // get header row
             Reader in = new FileReader(filename);
@@ -82,18 +101,21 @@ public class Abstractor {
 
             for (int i = 0; i < aMeta.size(); i++) {
                 Attribute a = aMeta.get(i);
-                if (i == num || (a.unitcol.equals(a.ISUNIT))) { // modify if mult subj cols
+                if (i == num || (a.isMeta)) { // modify if mult subj cols
                     continue;
                 }
-                else if (!a.unitcol.equals(a.NOUNIT)) {
-                    subject.append(subj + " <" + aMeta.get(i).resource + "> _:metadata .\n");
-                    subject.append("_:metadata" + " <" + aMeta.get(i).resource +
+                // add any anonymous node for metadata
+                else if (a.hasMetaData()) {
+                    subject.append(subj + " <" + a.resource + "> _:metadata" + i +" .\n");
+                    subject.append("_:metadata" + i + " <" + a.resource +
                             "> \"${" + headerRecord.get(i).trim() + "}\" .\n");
-                    subject.append("_:metadata" + " <" + aMeta.get(a.unitcol).resource +
-                            "> \"${" + headerRecord.get(a.unitcol).trim() + "}\" .\n");
+                    for (String k : a.metadata.keySet()) {
+                        subject.append("_:metadata" + i + " <" + k + "> \"" + a.metadata.get(k) +
+                                "\" .\n");
+                    }
                 }
                 else {
-                    subject.append(subj + " <" + aMeta.get(i).resource + "> \"${" +
+                    subject.append(subj + " <" + a.resource + "> \"${" +
                             headerRecord.get(i).trim() + "}\" .\n");
                 }
             }

@@ -154,7 +154,9 @@ public class AttributeHandler {
     }
 
     // Get input to identify if column unit dependant on another column
-    private Vector<Attribute> checkDependency(Vector<String> header, Vector<Attribute> attributes) throws Exception {
+    private Vector<Attribute> checkDependency(Vector<String> rHeader,
+                                              Vector<String> header,
+                                              Vector<Attribute> attributes) throws Exception {
         if(header.size() != attributes.size()){
             throw new Exception("Header size needs to match attribute size... attribute may have been" +
                     " lost in process");
@@ -162,14 +164,16 @@ public class AttributeHandler {
         // Store updates in dAttributes to be returned at the end
         Vector<Attribute> dAttributes = (Vector<Attribute>)attributes.clone();
 
+        // Output column headers
         for(int i = 0; i < header.size(); i++) {
             String s = header.get(i).trim();
             System.out.println(i + " : " + s);
         }
-        System.out.println("\nPlease indicate if any column specifies the unit of measurement for another column");
-        System.out.println("If there aren't any unit columns simply press enter");
-        System.out.println("The format to do so is \"UNIT_COL_NUM,MEASURE_COL_NUM:" +
-                "UNIT_COL2,MEASURE_COL2:UNIT_COL3,MEASURE_COL3\"\n");
+        // Get input for meta columns
+        System.out.println("\nPlease indicate if any column specifies metadata for another column");
+        System.out.println("If there aren't any metadata columns simply press enter");
+        System.out.println("The format to do so is \"META_COL_NUM,VAL_COL:" +
+                "META_COL2,VAL_COL2:META_COL3,VAL_COL3\"\n");
         System.out.print("Enter dependencies as instructed above: ");
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         String line = br.readLine().trim();
@@ -179,28 +183,21 @@ public class AttributeHandler {
                 for(int i = 0; i < dependencies.length; i++){
                     String [] pair = dependencies[i].split(",");
                     if(!pair[0].equals("")) {
-                        if(pair.length != 2) {
+                        if(pair.length != 2 || (pair[0].equals(pair[1]))) {
                             System.out.println(pair.length);
                             System.out.println("\""+pair[0]+"\"");
                             throw new Exception("Columns did not adhere to format given.");
                         }
-                        Integer unit = Integer.parseInt(pair[0].trim());
+                        Integer meta = Integer.parseInt(pair[0].trim());
                         Integer col = Integer.parseInt(pair[1].trim());
-                        Attribute a = dAttributes.get(col);
-                        a.unitcol = unit;
-                        a.metadata.put("Unit", "DEPENDENCY");
+                        dAttributes.get(col).metadata.put(dAttributes.get(meta).resource.toString(),
+                                "${"+rHeader.get(meta)+"}");
+                        dAttributes.get(meta).isMeta = true;
                     }
                 }
             }
         }
-        // if there are unit attributes update metadata to indicate it is a unit
-        for(int i = 0; i < dAttributes.size(); i++) {
-            Integer uc = dAttributes.get(i).unitcol;
-            if(!(uc.equals(Attribute.NOUNIT) || uc.equals(Attribute.ISUNIT))){
-                dAttributes.get(uc).unitcol = Attribute.ISUNIT;
-                dAttributes.get(uc).metadata.put("Unit", "TRUE");
-            }
-        }
+
         return dAttributes;
     }
 
@@ -219,21 +216,22 @@ public class AttributeHandler {
     }
 
     // function to get name of unit if measurement indentified for attribute
-    public Vector<Attribute> getUnits(Vector<String> header, Vector<Attribute> attributes) {
+    public Vector<Attribute> getUnits(Vector<String> rHeader, Vector<String> header, Vector<Attribute> attributes) {
+        final String UNIT = "http://umkc.edu/unit/";
         Vector<Attribute> attrsWithUnits = new Vector<Attribute>(attributes.size());
         try {
-            Vector<Attribute> tmp = checkDependency(header,attributes);
+            Vector<Attribute> tmp = checkDependency(rHeader, header, attributes);
             for(int i = 0; i < tmp.size(); i++) {
                 Attribute a = tmp.get(i);
-                if(a.unitcol.equals(-1)) {
+                if(!a.isMeta) {
                     Boolean measurement = isResourceAMeasurement(a.resource);
                     if(measurement) { // Gets unit from user, adds to graph and attribute
                         System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
                         System.out.print("Please enter the unit name: ");
                         Scanner s = new Scanner(System.in);
                         String unit = formatAttribute(s.nextLine().trim());
-                        createTriple(a.resource, "http://umkc.edu/unit.rdf", unit);
-                        a.metadata.put("Unit", unit);
+                        createTriple(a.resource, UNIT, unit);
+                        a.metadata.put("<"+UNIT+unit+">", unit);
                     }
                     System.out.print("Col " + i + " processed\n");
                 }
@@ -262,7 +260,7 @@ public class AttributeHandler {
 //            AttributeHandler ah = new AttributeHandler("sample.nt");
 //            Vector<Attribute> aMeta = ah.getUnits(header, ah.findAttributes(header));
 //            for(Attribute a : aMeta) {
-//                System.out.println("Unit col: " +a.unitcol + "\n");
+//                System.out.println("Unit col: " +a.metacol + "\n");
 //            }
 //        }
 //        catch (Exception e) {
