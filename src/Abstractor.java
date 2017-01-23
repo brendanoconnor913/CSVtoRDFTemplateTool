@@ -69,15 +69,13 @@ public class Abstractor {
 
             // get subject column index
             // if multi indices then separate by a space
-            System.out.print("Enter subject column: ");
+            System.out.print("Enter subject column(s) in the order you wish to appear: ");
             BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
             String[] subjectColIndexs = br.readLine().split(" ");
             Vector<Integer> subjects = new Vector();
             StringBuilder subject = new StringBuilder();
-            int num = -1; // for subj col
-            String subj = ""; // for subject string
             for(String subCol : subjectColIndexs) {
-                num = Integer.parseInt(subCol);
+                Integer num = Integer.parseInt(subCol);
                 // make sure in range
                 if(num < 0 || num >= headerRecord.size()) {
                     throw new Exception ("Outside of column index range");
@@ -85,15 +83,15 @@ public class Abstractor {
                 subjects.add(num);
 
                 // Make sure no spaces in column name
-                String subLit = header.get(num);
-                String[] holder = subLit.split(" ");
-                if(holder.length > 1) {
-                    StringBuilder sb = new StringBuilder();
-                    for(String s : holder) {
-                        sb.append(s);
-                    }
-                    subLit = sb.toString();
-                }
+//                String subLit = header.get(num);
+//                String[] holder = subLit.split(" ");
+//                if(holder.length > 1) {
+//                    StringBuilder sb = new StringBuilder();
+//                    for(String s : holder) {
+//                        sb.append(s);
+//                    }
+//                    subLit = sb.toString();
+//                }
                 // Create subject and first triple
                 subj = "<http://umkc.edu/subject#${" + subLit + "}>";
                 subject.append(subj + " <http://rdf/label> <" + aMeta.get(num).resource + "> .\n");
@@ -101,7 +99,7 @@ public class Abstractor {
 
             for (int i = 0; i < aMeta.size(); i++) {
                 Attribute a = aMeta.get(i);
-                if (i == num || (a.isMeta)) { // modify if mult subj cols
+                if (subjects.contains(i) || (a.isMeta)) { // modify if mult subj cols
                     continue;
                 }
                 // add any anonymous node for metadata
