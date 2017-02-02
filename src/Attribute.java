@@ -11,11 +11,13 @@ import java.util.Vector;
 public class Attribute {
     public Resource resource;
     public Boolean isMeta;
+    public String datatype;
     // If empty no metadata, all integers are column indicies of metdata for this attribute
     public Map<String,String> metadata = new HashMap<String, String>();
     Attribute(Resource r) {
         resource = r;
         isMeta = false;
+        datatype = "";
     }
 
     public Boolean hasMetaData() {

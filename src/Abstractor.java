@@ -43,6 +43,24 @@ public class Abstractor {
         return header;
     }
 
+    private static Vector<String> getFirstDataRow(String fname) {
+        Vector<String> dRow = new Vector<String>();
+        try {
+            Reader in = new FileReader(fname);
+            Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
+            CSVRecord headerRecord = recordForHeader.iterator().next();
+            CSVRecord dataRecord = recordForHeader.iterator().next();
+            for(int i = 0; i < dataRecord.size(); i++) {
+                String s = dataRecord.get(i).trim();
+                dRow.add(s);
+            }
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+        return dRow;
+    }
+
     public static void main(String args[]) {
         // TODO: after flow is working go back through and work on quality of triples created
 
@@ -51,10 +69,12 @@ public class Abstractor {
         String context = args[2]; // for quad creation
         try {
             // process column headers (map to resources and gather metadata)
-            Vector<String> tmpheader = getFormattedHeader(filename);
+            Vector<String> fmtheader = getFormattedHeader(filename);
             Vector<String> rawHeader = getHeader(filename);
+            Vector<String> dataRow = getFirstDataRow(filename);
             AttributeHandler ah = new AttributeHandler(graphname);
-            Vector<Attribute> aMeta = ah.getUnits(rawHeader, tmpheader, ah.findAttributes(tmpheader));
+            Vector<Attribute> aMeta = ah.getUnits(rawHeader, fmtheader, ah.findAttributes(fmtheader));
+            Vector<Attribute> aData = ah.addDataType(dataRow, aMeta);
 
             // get header row
             Reader in = new FileReader(filename);
@@ -100,11 +120,11 @@ public class Abstractor {
 
             StringBuilder allTrips = new StringBuilder();
             for (Integer n : subjects) {
-                allTrips.append(subject.toString() + " <http://rdf/label> <" + aMeta.get(n).resource + "> .\n");
+                allTrips.append(subject.toString() + " <http://rdf/label> <" + aData.get(n).resource + "> .\n");
             }
 
-            for (int i = 0; i < aMeta.size(); i++) {
-                Attribute a = aMeta.get(i);
+            for (int i = 0; i < aData.size(); i++) {
+                Attribute a = aData.get(i);
                 if (subjects.contains(i) || (a.isMeta)) { // modify if mult subj cols
                     continue;
                 }
@@ -112,15 +132,15 @@ public class Abstractor {
                 else if (a.hasMetaData()) {
                     allTrips.append(subject.toString() + " <" + a.resource + "> _:metadata" + i +" .\n");
                     allTrips.append("_:metadata" + i + " <" + a.resource +
-                            "> \"${" + headerRecord.get(i).trim() + "}\" .\n");
+                            "> \"${" + headerRecord.get(i).trim() + "}\"" + a.datatype + " .\n");
                     for (String k : a.metadata.keySet()) {
                         allTrips.append("_:metadata" + i + " <" + k + "> \"" + a.metadata.get(k) +
-                                "\" .\n");
+                                "\"" + a.datatype + " .\n");
                     }
                 }
                 else {
                     allTrips.append(subject.toString() + " <" + a.resource + "> \"${" +
-                            headerRecord.get(i).trim() + "}\" .\n");
+                            headerRecord.get(i).trim() + "}\""+ a.datatype +" .\n");
                 }
             }
 

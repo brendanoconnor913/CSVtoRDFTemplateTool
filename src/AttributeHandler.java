@@ -44,7 +44,7 @@ public class AttributeHandler {
     private void writeToModel() {
         try {
             PrintWriter pw = new PrintWriter(filename);
-            model.write(pw, "TTL");
+            model.write(pw, "NT");
             pw.close();
         }
         catch(Exception exec) {
@@ -243,28 +243,73 @@ public class AttributeHandler {
         }
         return attrsWithUnits;
     }
+    // helper function to determine if string contains boolean values
+    public boolean isBool(String s) {
+        Vector<String> bools = new Vector<String>();
+        bools.add("true");
+        bools.add("false");
+        return (bools.contains(s.trim().toLowerCase()));
+    }
+    // helper function to determine if string contains string values
+    public boolean isString(String s) {
+        char[] alphabet = {' ','a','b','c','d','e','f','g','h','i','j','k','l','m','n','o','p','q','r','s','t','u','v','w',
+                'x','y','z'};
+        char[] word = s.trim().toLowerCase().toCharArray();
+        for (char c : word) {
+            if (!ArrayUtils.contains(alphabet,c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // helper function to determine if string contains numerical values
+    public boolean isNumber(String s) {
+        char[] nums = {'1','2','3','4','5','6','7','8','9','0','-',',','.','+'};
+        char[] word = s.trim().toLowerCase().toCharArray();
+        for (char c : word) {
+            if (!ArrayUtils.contains(nums,c)) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    // helper function to determine if string contains decimal values
+    public boolean isDecimal(String s) {
+        return s.contains(".");
+    }
+
+    // Takes in vector of formed attributes, scans to figure out data type and attaches to given attribute
+    public Vector<Attribute> addDataType(Vector<String> dataRow, Vector<Attribute> pAttributes) {
+        Vector<Attribute> dAttributes = (Vector<Attribute>)pAttributes.clone();
+
+        for(int i = 0; i < dataRow.size();i++) {
+            String s = dataRow.get(i);
+            Attribute a = dAttributes.get(i);
+
+            if (isString(s)) {
+                if (isBool(s)) {
+                    a.datatype = "^^<http://www.w3.org/2001/XMLSchema#boolean>";
+                }
+                else {
+                    a.datatype = "^^<http://www.w3.org/2001/XMLSchema#string>";
+                }
+            }
+            else if (isNumber(s)) {
+                if(isDecimal(s)) {
+                    a.datatype = "^^<http://www.w3.org/2001/XMLSchema#decimal>";
+                }
+                else {
+                    a.datatype = "^^<http://www.w3.org/2001/XMLSchema#integer>";
+                }
+            }
+        }
+        return dAttributes;
+    }
+
 
 //    public static void main(String args[]) {
-//        // Reading in the attributes this will be done in the abstractor
-//        try {
-//            Reader in = new FileReader(args[0]);
-//            Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
-//            CSVRecord headerRecord = recordForHeader.iterator().next();
-//            Vector<String> header = new Vector<String>();
-//            for(int i = 0; i < headerRecord.size(); i++) {
-//                String s = formatAttribute(headerRecord.get(i).trim());
-//                header.add(s);
-//            }
-//            header.add("yard");
-//
-//            AttributeHandler ah = new AttributeHandler("sample.nt");
-//            Vector<Attribute> aMeta = ah.getUnits(header, ah.findAttributes(header));
-//            for(Attribute a : aMeta) {
-//                System.out.println("Unit col: " +a.metacol + "\n");
-//            }
-//        }
-//        catch (Exception e) {
-//            e.printStackTrace();
-//        }
+
 //    }
 }
