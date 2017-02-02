@@ -43,6 +43,7 @@ public class Abstractor {
         return header;
     }
 
+    // gets first row from data file being used
     private static Vector<String> getFirstDataRow(String fname) {
         Vector<String> dRow = new Vector<String>();
         try {
@@ -61,12 +62,7 @@ public class Abstractor {
         return dRow;
     }
 
-    public static void main(String args[]) {
-        // TODO: after flow is working go back through and work on quality of triples created
-
-        String filename = args[0];
-        String graphname = args[1];
-        String context = args[2]; // for quad creation
+    private void createTemplate(String filename, String graphname) {
         try {
             // process column headers (map to resources and gather metadata)
             Vector<String> fmtheader = getFormattedHeader(filename);
@@ -102,17 +98,6 @@ public class Abstractor {
                     throw new Exception ("Outside of column index range");
                 }
                 subjects.add(num);
-
-                // Make sure no spaces in column name
-//                String subLit = header.get(num);
-//                String[] holder = subLit.split(" ");
-//                if(holder.length > 1) {
-//                    StringBuilder sb = new StringBuilder();
-//                    for(String s : holder) {
-//                        sb.append(s);
-//                    }
-//                    subLit = sb.toString();
-//                }
                 subject.append("${" + header.get(num) + "}" + "-");
             }
             subject.deleteCharAt(subject.length()-1); // final subject string
@@ -145,14 +130,39 @@ public class Abstractor {
             }
 
             // Outputs created template to file
-            PrintStream out = new PrintStream(new FileOutputStream("triptemp.nt"));
-            System.setOut(out);
-            System.out.print(allTrips.toString());
+            char[] fstring = filename.toCharArray();
+            StringBuilder ns = new StringBuilder();
+            for (int i = 0; i < (fstring.length-4); i++) {
+                ns.append(fstring[i]);
+            }
+            String noSuffix = ns.toString();
+
+            File tempdir = new File("templates");
+            tempdir.mkdir();
+            PrintStream out = new PrintStream(new FileOutputStream(new File(tempdir, noSuffix + "-template.nt")));
+            out.print(allTrips.toString());
             out.close();
             in.close();
         }
         catch(Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void main(String args[]) {
+        String dirname = args[0];
+        String graphname = args[1];
+        String context = args[2]; // for quad creation
+        Abstractor aForAbstractor = new Abstractor();
+        File dir = new File(dirname);
+        if(dir.isDirectory()) {
+            File[] files = dir.listFiles();
+            for(File f : files) {
+                aForAbstractor.createTemplate(f.getName(),graphname);
+            }
+        }
+        else {
+            aForAbstractor.createTemplate(dirname, graphname);
         }
     }
 }

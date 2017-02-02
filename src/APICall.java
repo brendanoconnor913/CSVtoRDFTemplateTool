@@ -59,6 +59,7 @@ public class APICall {
             boolean c = isPresent(jsarray,"/r/RelatedTo","count");
             boolean d = isPresent(jsarray,"/r/RelatedTo","quantity");
             boolean isMeasurement =  a || b || c || d;
+            rd.close();
             return isMeasurement;
         }
         catch(Exception e) {
