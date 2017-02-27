@@ -14,11 +14,11 @@ import java.util.Vector;
  */
 public class AttributeHandler {
     private Model model = ModelFactory.createDefaultModel();
-    private String filename;
+    private String graphname;
 
     AttributeHandler(String graph) {
-        filename = graph;
-        model.read(filename);
+        graphname = graph; // file path to ontology graph
+        model.read(graphname);
     }
 
     // takes in column header and puts in uniform format
@@ -43,7 +43,7 @@ public class AttributeHandler {
     // Output changes to model file
     private void writeToModel() {
         try {
-            PrintWriter pw = new PrintWriter(filename);
+            PrintWriter pw = new PrintWriter(graphname);
             model.write(pw, "NT");
             pw.close();
         }
@@ -61,7 +61,7 @@ public class AttributeHandler {
 
     // adds an alias to existing metagraph
     private void createAlias(Resource r, String alias){
-        createTriple(r,"http://umkc.edu/alias.rdf",alias);
+        createTriple(r,"http://www.w3.org/2000/01/rdf-schema#label",alias);
     }
 
     // Create new entity and add to graph
@@ -72,15 +72,15 @@ public class AttributeHandler {
         String frname = new String(modname);
         String rname = "http://umkc.edu/resource/"+frname;
         Resource r = model.createResource(rname);
-        r.addProperty(ResourceFactory.createProperty("http://umkc.edu/alias.rdf"),
+        r.addProperty(ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#label"),
                 ResourceFactory.createPlainLiteral(name));
         writeToModel();
         return r;
     }
 
-    private String getAttributeInput(String unidentified) {
+    private String getAttributeInput(String unidentified, String sample) {
         System.out.println("\nThe system was unable to identify \"" + unidentified +
-                "\"\n\t(Press ENTER if you wish to keep given attribute name)");
+                "\" (Sample: \"" + sample + "\")\n\t(Press ENTER if you wish to keep given attribute name)");
         String userin;
         System.out.print(unidentified + " : ");
         Scanner s = new Scanner(System.in);
@@ -96,17 +96,17 @@ public class AttributeHandler {
 
     // Searches metagraph to try and find attribute if not found asks for user input for other possible alias
     // if found attaches new and old alias to resource if not creates new alias
-    public Vector<Attribute> findAttributes(Vector<String> header) {
+    public Vector<Attribute> findAttributes(Vector<String> header, Vector<String> firstrow) {
         Vector<Attribute> attributes = new Vector<Attribute>(header.size());
         try {
             for(int i = 0; i < header.size(); i++) {
                 String current = header.get(i);
-                String query = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf> \"" + current + "\".}";
+                String query = "SELECT ?x WHERE { ?x <http://www.w3.org/2000/01/rdf-schema#label> \"" + current + "\".}";
                 QueryExecution qexec = QueryExecutionFactory.create(query, model);
                 ResultSet results = qexec.execSelect();
                 if (!results.hasNext()) { // attribute not identified
-                    String in = getAttributeInput(current); // get new attribute name and search again
-                    String secondsearch = "SELECT ?x WHERE { ?x <http://umkc.edu/alias.rdf> \"" + in + "\".}";
+                    String in = getAttributeInput(current, firstrow.get(i)); // get new attribute name and search again
+                    String secondsearch = "SELECT ?x WHERE { ?x <http://www.w3.org/2000/01/rdf-schema#label> \"" + in + "\".}";
                     QueryExecution qex = QueryExecutionFactory.create(secondsearch, model);
                     ResultSet sndresult = qex.execSelect();
                     if (!sndresult.hasNext()) { // attribute not identified
@@ -135,7 +135,7 @@ public class AttributeHandler {
                     int rescnt = 0;
                     for( ; results.hasNext(); ) {
                         if(rescnt > 0) { // multiple results returned for alias name
-                            throw new Exception("Ambigious alias (alias found under multiple resources" +
+                            throw new Exception("Ambigious label (alias found under multiple resources" +
                                     " please remove duplicate before continuing.");
                         }
                         QuerySolution soln = results.nextSolution() ;
@@ -156,7 +156,8 @@ public class AttributeHandler {
     // Get input to identify if column unit dependant on another column
     private Vector<Attribute> checkDependency(Vector<String> rHeader,
                                               Vector<String> header,
-                                              Vector<Attribute> attributes) throws Exception {
+                                              Vector<Attribute> attributes,
+                                              Vector<String> firstrow) throws Exception {
         if(header.size() != attributes.size()){
             throw new Exception("Header size needs to match attribute size... attribute may have been" +
                     " lost in process");
@@ -167,7 +168,7 @@ public class AttributeHandler {
         // Output column headers
         for(int i = 0; i < header.size(); i++) {
             String s = header.get(i).trim();
-            System.out.println(i + " : " + s);
+            System.out.println(i + " : " + s + " (Sample: \"" + firstrow.get(i) + "\")");
         }
         // Get input for meta columns
         System.out.println("\nPlease indicate if any column specifies metadata for another column");
@@ -191,7 +192,7 @@ public class AttributeHandler {
                         Integer meta = Integer.parseInt(pair[0].trim());
                         Integer col = Integer.parseInt(pair[1].trim());
                         dAttributes.get(col).metadata.put(dAttributes.get(meta).resource.toString(),
-                                "${"+rHeader.get(meta)+"}");
+                                "\"${"+rHeader.get(meta)+"}\""+dAttributes.get(meta).datatype);
                         dAttributes.get(meta).isMeta = true;
                     }
                 }
@@ -204,7 +205,7 @@ public class AttributeHandler {
     // Calls API to attempt to indetify if attribute is a quantity
     private Boolean isResourceAMeasurement(Resource r) {
         Boolean isMes = false;
-        String query = "SELECT ?x WHERE { <"+r.toString()+"> <http://umkc.edu/alias.rdf> ?x .}";
+        String query = "SELECT ?x WHERE { <"+r.toString()+"> <http://www.w3.org/2000/01/rdf-schema#label> ?x .}";
         QueryExecution qexec = QueryExecutionFactory.create(query, model);
         ResultSet results = qexec.execSelect();
         for( ; results.hasNext(); ) {
@@ -216,22 +217,39 @@ public class AttributeHandler {
     }
 
     // function to get name of unit if measurement indentified for attribute
-    public Vector<Attribute> getUnits(Vector<String> rHeader, Vector<String> header, Vector<Attribute> attributes) {
-        final String UNIT = "http://umkc.edu/unit/";
+    public Vector<Attribute> getUnits(Vector<String> rHeader,
+                                      Vector<String> header,
+                                      Vector<Attribute> attributes,
+                                      Vector<String> firstrow) {
+        final String UNIT = "http://umkc.edu/unit";
         Vector<Attribute> attrsWithUnits = new Vector<Attribute>(attributes.size());
         try {
-            Vector<Attribute> tmp = checkDependency(rHeader, header, attributes);
+            Vector<Attribute> tmp = checkDependency(rHeader, header, attributes, firstrow);
             for(int i = 0; i < tmp.size(); i++) {
                 Attribute a = tmp.get(i);
-                if(!a.isMeta) {
-                    Boolean measurement = isResourceAMeasurement(a.resource);
-                    if(measurement) { // Gets unit from user, adds to graph and attribute
-                        System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
-                        System.out.print("Please enter the unit name: ");
-                        Scanner s = new Scanner(System.in);
-                        String unit = formatAttribute(s.nextLine().trim());
-                        createTriple(a.resource, UNIT, unit);
-                        a.metadata.put("<"+UNIT+unit+">", unit);
+                if(!a.isMeta && !a.hasMetaData()) {
+                    String query = "SELECT ?x WHERE { "+"<"+a.resource.toString()+">"+" <http://umkc.edu/unit> ?x .}";
+                    QueryExecution qexec = QueryExecutionFactory.create(query, model);
+                    ResultSet results = qexec.execSelect();
+                    if (!results.hasNext()) {
+                        Boolean measurement = isResourceAMeasurement(a.resource);
+                        if(measurement) { // Gets unit from user, adds to graph and attribute
+                            System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
+                            System.out.print("Please enter the unit name (input NA if not a measurement): ");
+                            Scanner s = new Scanner(System.in);
+                            if (!s.nextLine().equals("NA")) {
+                                String unit = formatAttribute(s.nextLine().trim());
+                                createTriple(a.resource, UNIT, unit);
+                                a.metadata.put(UNIT, unit);
+                            }
+                        }
+                    }
+                    else {
+                        // TODO: Expand this to let user choose which literal if multi results returned
+                        QuerySolution solution = results.nextSolution();
+                        Literal unitlit = solution.getLiteral("x");
+                        String unitstr = unitlit.toString();
+                        a.metadata.put(UNIT,unitstr);
                     }
                     System.out.print("Col " + i + " processed\n");
                 }
@@ -281,10 +299,12 @@ public class AttributeHandler {
     }
 
     // Takes in vector of formed attributes, scans to figure out data type and attaches to given attribute
-    public Vector<Attribute> addDataType(Vector<String> dataRow, Vector<Attribute> pAttributes) {
+    public Vector<Attribute> addDataType(Vector<String> dataRow, Vector<Attribute> pAttributes) throws Exception {
         Vector<Attribute> dAttributes = (Vector<Attribute>)pAttributes.clone();
-
         for(int i = 0; i < dataRow.size();i++) {
+            if (dataRow.size() != dAttributes.size()) {
+                throw new Exception("Vector sizes don't match in data and attributes");
+            }
             String s = dataRow.get(i);
             Attribute a = dAttributes.get(i);
 
@@ -307,9 +327,4 @@ public class AttributeHandler {
         }
         return dAttributes;
     }
-
-
-//    public static void main(String args[]) {
-
-//    }
 }
