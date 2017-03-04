@@ -4,12 +4,12 @@ import org.apache.commons.csv.CSVRecord;
 import java.io.*;
 import java.util.Vector;
 
+
 /**
  * Created by brendan on 10/9/16.
  */
 
-// TODO: Need to figure out the role an attribute like year plays in being subject vs. unit
-    // maybe there is a rule to simplify
+
 public class Abstractor {
     // function to return vector containing header for each column
     private static Vector<String> getFormattedHeader(String fname) {
@@ -143,8 +143,17 @@ public class Abstractor {
             subject.append(">");
 
             StringBuilder allTrips = new StringBuilder();
+            final String MADEOF = "<http://umkc.edu/composedOf>";
+            if (subjects.size() > 1) {
+                allTrips.append(subject.toString() + " " + MADEOF + " _:comp . \n");
+                for (Integer n : subjects) {
+                    allTrips.append("_:comp " + MADEOF + " <" + aMeta.get(n).resource.toString() + "> . \n");
+                }
+            }
+
             for (Integer n : subjects) {
-                allTrips.append(subject.toString() + " <http://www.w3.org/1999/02/22-rdf-syntax-ns#type> <" + aMeta.get(n).resource + "> .\n");
+               allTrips.append("<" + aMeta.get(n).resource + "> <http://www.w3.org/2001/XMLSchema#literal> \"${" +
+                       header.get(n) + "}\" .\n");
             }
 
             for (int i = 0; i < aMeta.size(); i++) {
@@ -195,14 +204,23 @@ public class Abstractor {
         String context = args[2]; // for quad creation
         Abstractor aForAbstractor = new Abstractor();
         File dir = new File(dirname);
-        if(dir.isDirectory()) {
-            File[] files = dir.listFiles();
-            for(File f : files) {
-                aForAbstractor.createTemplate(f.getName(),graphname, dir.getAbsolutePath());
-            }
+//        if(dir.isDirectory()) {
+//            File[] files = dir.listFiles();
+//            for(File f : files) {
+//                aForAbstractor.createTemplate(f.getName(),graphname, dir.getAbsolutePath());
+//            }
+//        }
+//        else {
+//            aForAbstractor.createTemplate(dirname, graphname, "");
+//        }
+        try {
+            ProcessBuilder pb = new ProcessBuilder("templateconverter.sh", "test");
+            pb.inheritIO();
+//            pb.directory("CSV2RDFTemplateAbstractor")
+            pb.start();
         }
-        else {
-            aForAbstractor.createTemplate(dirname, graphname, "");
+        catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
