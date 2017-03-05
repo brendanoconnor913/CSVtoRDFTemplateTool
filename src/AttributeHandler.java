@@ -26,11 +26,13 @@ public class AttributeHandler {
         char[] symbols = {' ','-',',','<','>','%','(',')','/','\\'};// symbols to be removed from attributes
         StringBuilder sb = new StringBuilder();
         // remove symbols, spaces -> _ , and convert to all lower case
-        for(char c : attr.toCharArray()) {
+        for(char c : attr.trim().toCharArray()) {
             if(ArrayUtils.contains(symbols, c)) {
-                char prev = sb.charAt(sb.length()-1);
-                if(prev != '_') {
-                    sb.append('_');
+                if (sb.length() > 0) {
+                    char prev = sb.charAt(sb.length()-1);
+                    if(prev != '_') {
+                        sb.append('_');
+                    }
                 }
             }
             else {
@@ -173,8 +175,8 @@ public class AttributeHandler {
         // Get input for meta columns
         System.out.println("\nPlease indicate if any column specifies metadata for another column");
         System.out.println("If there aren't any metadata columns simply press enter");
-        System.out.println("The format to do so is \"META_COL_NUM,VAL_COL:" +
-                "META_COL2,VAL_COL2:META_COL3,VAL_COL3\"\n");
+        System.out.println("The format to do so is META_COL_NUM,VAL_COL:" +
+                "META_COL2,VAL_COL2:META_COL3,VAL_COL3\n");
         System.out.print("Enter dependencies as instructed above: ");
         BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
         String line = br.readLine().trim();

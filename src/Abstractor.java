@@ -2,6 +2,9 @@ import dnl.utils.text.table.TextTable;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import java.io.*;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.util.Scanner;
 import java.util.Vector;
 
 
@@ -12,6 +15,15 @@ import java.util.Vector;
 
 public class Abstractor {
     // function to return vector containing header for each column
+    static String stripFileExtension(String filename) {
+        char[] fstring = filename.toCharArray();
+        StringBuilder ns = new StringBuilder();
+        for (int i = 0; i < (fstring.length-4); i++) {
+            ns.append(fstring[i]);
+        }
+        return ns.toString();
+    }
+
     private static Vector<String> getFormattedHeader(String fname) {
         Vector<String> header = new Vector<String>();
         try {
@@ -177,16 +189,13 @@ public class Abstractor {
                 }
             }
 
-            // Outputs created template to file
-            char[] fstring = filename.toCharArray();
-            StringBuilder ns = new StringBuilder();
-            for (int i = 0; i < (fstring.length-4); i++) {
-                ns.append(fstring[i]);
-            }
-            String noSuffix = ns.toString();
+            String noSuffix = stripFileExtension(filename);
 
-            File tempdir = new File("templates");
-            tempdir.mkdir();
+            File tempdir = new File("output-templates");
+            if (!tempdir.exists()) {
+                tempdir.mkdir();
+            }
+
             File outfile = new File(tempdir, noSuffix + "-template.nt");
             PrintStream out = new PrintStream(new FileOutputStream(outfile));
             out.print(allTrips.toString());
@@ -198,29 +207,60 @@ public class Abstractor {
         }
     }
 
-    public static void main(String args[]) {
-        String dirname = args[0];
-        String graphname = args[1];
-        String context = args[2]; // for quad creation
-        Abstractor aForAbstractor = new Abstractor();
-        File dir = new File(dirname);
-//        if(dir.isDirectory()) {
-//            File[] files = dir.listFiles();
-//            for(File f : files) {
-//                aForAbstractor.createTemplate(f.getName(),graphname, dir.getAbsolutePath());
-//            }
-//        }
-//        else {
-//            aForAbstractor.createTemplate(dirname, graphname, "");
-//        }
+    public void tripToQuad(String triplesfile, String outputfile, String contexturl) {
         try {
-            ProcessBuilder pb = new ProcessBuilder("templateconverter.sh", "test");
-            pb.inheritIO();
-//            pb.directory("CSV2RDFTemplateAbstractor")
-            pb.start();
+            final String CONTEXT = " <"+contexturl+"> ";
+            String line = "";
+            BufferedReader br = new BufferedReader(new FileReader(triplesfile));
+            File quads = new File("output-quads");
+            if (!quads.exists()) {
+                quads.mkdir();
+            }
+            PrintWriter pw = new PrintWriter(new FileOutputStream(new File(quads, outputfile)));
+            while((line = br.readLine()) != null){
+                String[] trip = line.split(" ");
+                if (trip.length != 4) {
+                    throw new Exception ("Invalid number of \"words\" in line");
+                }
+                String quad = trip[0] + " " + trip[1] + " " + trip[2] + CONTEXT + trip[3];
+                pw.println(quad);
+            }
+            br.close();
+            pw.close();
         }
         catch (Exception e) {
             e.printStackTrace();
+        }
+    }
+
+    public static void main(String args[]) {
+        String dirname = args[0];
+        String graphname = args[1];
+        Abstractor aForAbstractor = new Abstractor();
+        CSV2RDF cr = new CSV2RDF(true);
+        File dir = new File(dirname);
+        if(dir.isDirectory()) {
+            File[] files = dir.listFiles();
+            for(File f : files) {
+                String fileroot = stripFileExtension(f.getName());
+                aForAbstractor.createTemplate(f.getName(),graphname, dir.getAbsolutePath());
+                Scanner scan = new Scanner(System.in);
+                System.out.print("Please give the url source for " + f.getName() + ": ");
+                String url = scan.nextLine().trim();
+                String outtrips = "output-triples/"+fileroot+"-triples.nt";
+                cr.run("output-templates/"+fileroot+"-template.nt", f.toString(), outtrips);
+                aForAbstractor.tripToQuad(outtrips,fileroot+"-quads.nq",url);
+            }
+        }
+        else { // dirfile = single input file
+            String fileroot = stripFileExtension(dirname);
+            aForAbstractor.createTemplate(dirname, graphname, "");
+            Scanner scan = new Scanner(System.in);
+            System.out.print("Please give the url source for " + dirname + ":");
+            String url = scan.nextLine().trim();
+            String outtrips = "output-triples/"+fileroot+"-triples.nt";
+            cr.run("output-templates/"+fileroot+"-template.nt", dirname, outtrips);
+            aForAbstractor.tripToQuad(outtrips,fileroot+"quads.nq",url);
         }
     }
 }
