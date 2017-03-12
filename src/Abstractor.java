@@ -1,6 +1,8 @@
 import dnl.utils.text.table.TextTable;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
+import org.apache.commons.io.FileUtils;
+
 import java.io.*;
 import java.util.Scanner;
 import java.util.Vector;
@@ -9,8 +11,6 @@ import java.util.Vector;
 /**
  * Created by brendan on 10/9/16.
  */
-
-// TODO: next step running more csv files through, final append step
 
 public class Abstractor {
     // function to return vector containing header for each column
@@ -207,15 +207,13 @@ public class Abstractor {
     }
 
     public void tripToQuad(String triplesfile, String outputfile, String contexturl) {
+        System.out.println("Adding context to triples ...");
         try {
             final String CONTEXT = " <"+contexturl+"> ";
             String line = "";
             BufferedReader br = new BufferedReader(new FileReader(triplesfile));
-            File quads = new File("output-quads");
-            if (!quads.exists()) {
-                quads.mkdir();
-            }
-            PrintWriter pw = new PrintWriter(new FileOutputStream(new File(quads, outputfile)));
+
+            PrintWriter pw = new PrintWriter(new FileOutputStream(new File(outputfile)));
             while((line = br.readLine()) != null){
                 String[] trip = line.split(" ");
                 if (trip.length != 4) {
@@ -238,6 +236,11 @@ public class Abstractor {
         Abstractor aForAbstractor = new Abstractor();
         CSV2RDF cr = new CSV2RDF(true);
         File dir = new File(dirname);
+        IdentityChecker ic = new IdentityChecker();
+        File quads = new File("output-quads");
+        if (!quads.exists()) {
+            quads.mkdir();
+        }
         if(dir.isDirectory()) {
             File[] files = dir.listFiles();
             for(File f : files) {
@@ -247,8 +250,10 @@ public class Abstractor {
                 System.out.print("Please give the url source for " + f.getName() + ": ");
                 String url = scan.nextLine().trim();
                 String outtrips = "output-triples/"+fileroot+"-triples.nt";
+                String outquads = "output-quads/"+fileroot+"-quads.nq";
                 cr.run("output-templates/"+fileroot+"-template.nt", f.toString(), outtrips);
-                aForAbstractor.tripToQuad(outtrips,fileroot+"-quads.nq",url);
+                aForAbstractor.tripToQuad(outtrips,outquads,url);
+                ic.addRelations(outquads, "output-quads/identity-quads.nq");
             }
         }
         else { // dirfile = single input file
@@ -258,8 +263,24 @@ public class Abstractor {
             System.out.print("Please give the url source for " + dirname + ":");
             String url = scan.nextLine().trim();
             String outtrips = "output-triples/"+fileroot+"-triples.nt";
+            String outquads = "output-quads/"+fileroot+"-quads.nq";
             cr.run("output-templates/"+fileroot+"-template.nt", dirname, outtrips);
-            aForAbstractor.tripToQuad(outtrips,fileroot+"quads.nq",url);
+            aForAbstractor.tripToQuad(outtrips,outquads,url);
+            ic.addRelations(outquads, "output-quads/identity-quads.nq");
         }
+
+        // Concat all quad files into one
+        // probably not feasible to do locally
+//        File finalout = new File("output-final/allquads.nq");
+//        File[] quadfiles = quads.listFiles();
+//        try {
+//            for (File q : quadfiles) {
+//                String qstring = FileUtils.readFileToString(q);
+//                FileUtils.write(finalout, qstring, true);
+//            }
+//        }
+//        catch (Exception e) {
+//            e.printStackTrace();
+//        }
     }
 }
