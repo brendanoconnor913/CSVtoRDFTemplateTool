@@ -2,8 +2,6 @@ import dnl.utils.text.table.TextTable;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import java.io.*;
-import java.nio.file.Files;
-import java.nio.file.Path;
 import java.util.Scanner;
 import java.util.Vector;
 
@@ -12,6 +10,7 @@ import java.util.Vector;
  * Created by brendan on 10/9/16.
  */
 
+// TODO: next step running more csv files through, final append step
 
 public class Abstractor {
     // function to return vector containing header for each column
