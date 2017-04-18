@@ -1,9 +1,8 @@
 import dnl.utils.text.table.TextTable;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.commons.io.FileUtils;
-
 import java.io.*;
+import java.util.List;
 import java.util.Scanner;
 import java.util.Vector;
 
@@ -11,6 +10,9 @@ import java.util.Vector;
 /**
  * Created by brendan on 10/9/16.
  */
+
+//TODO: Modify to seperately ask for units
+//TODO: Modify to ask for subject first?
 
 public class Abstractor {
     // function to return vector containing header for each column
@@ -107,7 +109,7 @@ public class Abstractor {
         }
     }
 
-    private void createTemplate(String filename, String graphname, String dirname) {
+    private List<Integer> createTemplate(String filename, String graphname, String dirname) {
         try {
             // process column headers (map to resources and gather metadata)
             String filepath = dirname + "/" + filename;
@@ -117,7 +119,6 @@ public class Abstractor {
             AttributeHandler ah = new AttributeHandler(graphname);
             Vector<Attribute> aData = ah.addDataType(dataRow, ah.findAttributes(fmtheader, dataRow));
             Vector<Attribute> aMeta = ah.getUnits(rawHeader, fmtheader, aData, dataRow);
-
 
             // get header row
             Reader in = new FileReader(filepath);
@@ -158,14 +159,15 @@ public class Abstractor {
             if (subjects.size() > 1) {
                 allTrips.append(subject.toString() + " " + MADEOF + " _:comp . \n");
                 for (Integer n : subjects) {
-                    allTrips.append("_:comp " + MADEOF + " <" + aMeta.get(n).resource.toString() + "> . \n");
+                    allTrips.append("_:comp <" + aMeta.get(n).resource.toString() + "> \"${"
+                            +header.get(n)+"}\" . \n");
                 }
             }
 
-            for (Integer n : subjects) {
-               allTrips.append("<" + aMeta.get(n).resource + "> <http://www.w3.org/2001/XMLSchema#literal> \"${" +
-                       header.get(n) + "}\" .\n");
-            }
+//            for (Integer n : subjects) {
+//               allTrips.append("<" + aMeta.get(n).resource + "> <http://www.w3.org/2001/XMLSchema#literal> \"${" +
+//                       header.get(n) + "}\" .\n");
+//            }
 
             for (int i = 0; i < aMeta.size(); i++) {
                 Attribute a = aMeta.get(i);
@@ -175,11 +177,11 @@ public class Abstractor {
                 // add any anonymous node for metadata
                 else if (a.hasMetaData()) {
                     allTrips.append(subject.toString() + " <" + a.resource + "> _:metadata" + i +" .\n");
-                    allTrips.append("_:metadata" + i + " <" + a.resource +
-                            "> \"${" + headerRecord.get(i).trim() + "}\"" + a.datatype + " .\n");
+                    allTrips.append("_:metadata" + i + " <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> " +
+                            "\"${" + headerRecord.get(i).trim() + "}\"" + a.datatype + " .\n");
                     for (String k : a.metadata.keySet()) {
-                        allTrips.append("_:metadata" + i + " <" + k + "> " + a.metadata.get(k) +
-                                " .\n");
+                        allTrips.append("_:metadata" + i + " <" + k + "> \"" + a.metadata.get(k) +
+                                "\" .\n");
                     }
                 }
                 else {
@@ -200,10 +202,12 @@ public class Abstractor {
             out.print(allTrips.toString());
             out.close();
             in.close();
+            return subjects;
         }
         catch(Exception e) {
             e.printStackTrace();
         }
+        return new Vector<Integer>();
     }
 
     public void tripToQuad(String triplesfile, String outputfile, String contexturl) {
@@ -215,11 +219,8 @@ public class Abstractor {
 
             PrintWriter pw = new PrintWriter(new FileOutputStream(new File(outputfile)));
             while((line = br.readLine()) != null){
-                String[] trip = line.split(" ");
-                if (trip.length != 4) {
-                    throw new Exception ("Invalid number of \"words\" in line");
-                }
-                String quad = trip[0] + " " + trip[1] + " " + trip[2] + CONTEXT + trip[3];
+                String modline = line.substring(0,line.length()-2);
+                String quad = new StringBuilder(modline).append(CONTEXT+".").toString();
                 pw.println(quad);
             }
             br.close();
@@ -237,50 +238,38 @@ public class Abstractor {
         CSV2RDF cr = new CSV2RDF(true);
         File dir = new File(dirname);
         IdentityChecker ic = new IdentityChecker();
+
         File quads = new File("output-quads");
         if (!quads.exists()) {
             quads.mkdir();
         }
+
         if(dir.isDirectory()) {
             File[] files = dir.listFiles();
             for(File f : files) {
                 String fileroot = stripFileExtension(f.getName());
-                aForAbstractor.createTemplate(f.getName(),graphname, dir.getAbsolutePath());
+                List<Integer> subcols = aForAbstractor.createTemplate(f.getName(),graphname, dir.getAbsolutePath());
                 Scanner scan = new Scanner(System.in);
                 System.out.print("Please give the url source for " + f.getName() + ": ");
                 String url = scan.nextLine().trim();
                 String outtrips = "output-triples/"+fileroot+"-triples.nt";
+                cr.run("output-templates/"+fileroot+"-template.nt", f.toString(), outtrips, subcols);
                 String outquads = "output-quads/"+fileroot+"-quads.nq";
-                cr.run("output-templates/"+fileroot+"-template.nt", f.toString(), outtrips);
                 aForAbstractor.tripToQuad(outtrips,outquads,url);
-                ic.addRelations(outquads, "output-quads/identity-quads.nq");
+                // ic.addRelations(outquads, "output-quads/identity-quads.nq");
             }
         }
         else { // dirfile = single input file
             String fileroot = stripFileExtension(dirname);
-            aForAbstractor.createTemplate(dirname, graphname, "");
+            List<Integer> subcols = aForAbstractor.createTemplate(dirname, graphname, "");
             Scanner scan = new Scanner(System.in);
             System.out.print("Please give the url source for " + dirname + ":");
             String url = scan.nextLine().trim();
             String outtrips = "output-triples/"+fileroot+"-triples.nt";
+            cr.run("output-templates/"+fileroot+"-template.nt", dirname, outtrips, subcols);
             String outquads = "output-quads/"+fileroot+"-quads.nq";
-            cr.run("output-templates/"+fileroot+"-template.nt", dirname, outtrips);
             aForAbstractor.tripToQuad(outtrips,outquads,url);
-            ic.addRelations(outquads, "output-quads/identity-quads.nq");
+            // ic.addRelations(outquads, "output-quads/identity-quads.nq");
         }
-
-        // Concat all quad files into one
-        // probably not feasible to do locally
-//        File finalout = new File("output-final/allquads.nq");
-//        File[] quadfiles = quads.listFiles();
-//        try {
-//            for (File q : quadfiles) {
-//                String qstring = FileUtils.readFileToString(q);
-//                FileUtils.write(finalout, qstring, true);
-//            }
-//        }
-//        catch (Exception e) {
-//            e.printStackTrace();
-//        }
     }
 }

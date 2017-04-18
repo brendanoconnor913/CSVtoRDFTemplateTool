@@ -83,7 +83,7 @@ public class CSV2RDF {
 	private int inputRows = 0;
 	private int outputTriples = 0;
 
-	public void run(String templatef, String input, String output) {
+	public void run(String templatef, String input, String output, List<Integer> subjIndices) {
 
 		File templateFile = new File(templatef);
 		File inputFile = new File(input);
@@ -103,7 +103,7 @@ public class CSV2RDF {
 			Writer out = Files.newWriter(outputFile, OUTPUT_CHARSET);
 			RDFWriter writer = Rio.createWriter(RDFFormat.forFileName(outputFile.getName(), RDFFormat.TURTLE), out);
 
-			Template template = new Template(Arrays.asList(row), templateFile, writer);
+			Template template = new Template(Arrays.asList(row), templateFile, writer, subjIndices);
 
 			while ((row = reader.readNext()) != null) {
 				template.generate(row, writer);
@@ -147,11 +147,11 @@ public class CSV2RDF {
 		private List<StatementGenerator> stmts = Lists.newArrayList();
 		private List<ValueProvider> valueProviders = Lists.newArrayList();
 
-		Template(List<String> cols, File templateFile, RDFWriter writer) throws Exception {
-			parseTemplate(cols, templateFile, writer);
+		Template(List<String> cols, File templateFile, RDFWriter writer, List<Integer> subjIndices) throws Exception {
+			parseTemplate(cols, templateFile, writer, subjIndices);
 		}
 
-		private String insertPlaceholders(List<String> cols, File templateFile) throws Exception {
+		private String insertPlaceholders(List<String> cols, File templateFile, List<Integer> subjIndices) throws Exception {
 			Pattern p = Pattern.compile("([\\$|\\#]\\{[^}]*\\})");
 
 			Matcher m = p.matcher(Files.toString(templateFile, INPUT_CHARSET));
@@ -159,7 +159,7 @@ public class CSV2RDF {
 			while (m.find()) {
 				String var = m.group(1);
 				String varName = var.substring(2, var.length() - 1);
-				ValueProvider valueProvider = valueProviderFor(varName, cols);
+				ValueProvider valueProvider = valueProviderFor(varName, cols, subjIndices);
 				Preconditions.checkArgument(valueProvider != null, "Invalid template variable", var);
 				valueProvider.isHash = (var.charAt(0) == '#');
 				m.appendReplacement(sb, valueProvider.placeholder);
@@ -170,7 +170,7 @@ public class CSV2RDF {
 			return sb.toString();
 		}
 
-		private ValueProvider valueProviderFor(String varName, List<String> cols) throws Exception {
+		private ValueProvider valueProviderFor(String varName, List<String> cols, List<Integer> subjIndices) throws Exception {
 			if (varName.equalsIgnoreCase("_ROW_")) {
 				return new RowNumberProvider(); 
 			}
@@ -195,11 +195,12 @@ public class CSV2RDF {
 //					}
 //				}
 //			}
-			return index == -1 ? null : new RowValueProvider(index);
+			return index == -1 ? null : new RowValueProvider(index, subjIndices);
 		}
 
-		private void parseTemplate(List<String> cols, File templateFile, final RDFWriter writer) throws Exception {
-			String templateStr = insertPlaceholders(cols, templateFile);
+		private void parseTemplate(List<String> cols, File templateFile, final RDFWriter writer, List<Integer> subjIndices)
+				throws Exception {
+			String templateStr = insertPlaceholders(cols, templateFile, subjIndices);
 
 			RDFParser parser = Rio.createParser(RDFFormat.forFileName(templateFile.getName()));
 			parser.setParserConfig(getParserConfig());
@@ -312,13 +313,20 @@ public class CSV2RDF {
 
 	private static class RowValueProvider extends ValueProvider {
 		private final int colIndex;
+		private final List<Integer> subjIndices;
 
-		private RowValueProvider(int colIndex) {
+		private RowValueProvider(int colIndex, List<Integer> si) {
 			this.colIndex = colIndex;
+			this.subjIndices = si;
 		}
 
 		protected String provideValue(int rowIndex, String[] row) {
-			return row[colIndex];
+			if (subjIndices.contains(colIndex)) {
+				return AttributeHandler.formatAttribute(row[colIndex]);
+			}
+			else {
+				return row[colIndex];
+			}
 		}
 	}
 
@@ -383,12 +391,7 @@ public class CSV2RDF {
 			String result = template;
 			for (ValueProvider provider : providers) {
                 String value;
-                if (formatvalues) {
-                    value = AttributeHandler.formatAttribute(provider.provide(rowIndex, row));
-                }
-				else {
-                    value = provider.provide(rowIndex, row);
-                }
+				value = provider.provide(rowIndex, row);
 				if (value != null && !value.isEmpty()) {
 					result = result.replace(provider.placeholder, value);
 				}

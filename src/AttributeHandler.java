@@ -39,6 +39,7 @@ public class AttributeHandler {
                 sb.append(Character.toLowerCase(c));
             }
         }
+
         return sb.toString();
     }
 
@@ -69,10 +70,7 @@ public class AttributeHandler {
     // Create new entity and add to graph
     private Resource createEntity(String name){
         // Capitalize the first letter then create as entity
-        char[] modname = name.toCharArray();
-        modname[0] = Character.toUpperCase(modname[0]);
-        String frname = new String(modname);
-        String rname = "http://umkc.edu/resource/"+frname;
+        String rname = "http://umkc.edu/resource/"+name;
         Resource r = model.createResource(rname);
         r.addProperty(ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#label"),
                 ResourceFactory.createPlainLiteral(name));
@@ -194,7 +192,7 @@ public class AttributeHandler {
                         Integer meta = Integer.parseInt(pair[0].trim());
                         Integer col = Integer.parseInt(pair[1].trim());
                         dAttributes.get(col).metadata.put(dAttributes.get(meta).resource.toString(),
-                                "\"${"+rHeader.get(meta)+"}\""+dAttributes.get(meta).datatype);
+                                "${"+rHeader.get(meta)+"}"+dAttributes.get(meta).datatype);
                         dAttributes.get(meta).isMeta = true;
                     }
                 }
