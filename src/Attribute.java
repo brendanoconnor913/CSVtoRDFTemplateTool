@@ -12,12 +12,16 @@ public class Attribute {
     public Resource resource;
     public Boolean isMeta;
     public String datatype;
+    public String unit;
+    public Integer index;
     // If empty no metadata, all integers are column indicies of metdata for this attribute
-    public Map<String,String> metadata = new HashMap<String, String>();
-    Attribute(Resource r) {
+    public Vector<Attribute> metadata = new Vector<Attribute>();
+    Attribute(Resource r, Integer indx) {
         resource = r;
         isMeta = false;
         datatype = "";
+        unit = "";
+        index = indx;
     }
 
     public Boolean hasMetaData() {

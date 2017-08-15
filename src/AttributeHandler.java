@@ -70,7 +70,8 @@ public class AttributeHandler {
     // Create new entity and add to graph
     private Resource createEntity(String name){
         // Capitalize the first letter then create as entity
-        String rname = "http://umkc.edu/resource/"+name;
+        String pname = name.replaceAll("\uFEFF","").trim();
+        String rname = "http://umkc.edu/resource/"+pname;
         Resource r = model.createResource(rname);
         r.addProperty(ResourceFactory.createProperty("http://www.w3.org/2000/01/rdf-schema#label"),
                 ResourceFactory.createPlainLiteral(name));
@@ -112,7 +113,7 @@ public class AttributeHandler {
                     if (!sndresult.hasNext()) { // attribute not identified
                         Resource nr = createEntity(in);
                         createAlias(nr,current);
-                        attributes.add(new Attribute(nr));
+                        attributes.add(new Attribute(nr,i));
                     }
                     else {
                         int rescnt = 0;
@@ -126,7 +127,7 @@ public class AttributeHandler {
                             createAlias(r,current);
                             System.out.println(r + " was identified from " + in + "(originally was \""
                                     + current + "\").");
-                            attributes.add(new Attribute(r));
+                            attributes.add(new Attribute(r,i));
                             rescnt++;
                         }
                     }
@@ -140,7 +141,7 @@ public class AttributeHandler {
                         }
                         QuerySolution soln = results.nextSolution() ;
                         Resource r = soln.getResource("x");
-                        attributes.add(new Attribute(r));
+                        attributes.add(new Attribute(r,i));
                         System.out.println(r);
                         rescnt++;
                     }
@@ -154,8 +155,7 @@ public class AttributeHandler {
     }
 
     // Get input to identify if column unit dependant on another column
-    private Vector<Attribute> checkDependency(Vector<String> rHeader,
-                                              Vector<String> header,
+    private Vector<Attribute> checkDependency(Vector<String> header,
                                               Vector<Attribute> attributes,
                                               Vector<String> firstrow) throws Exception {
         if(header.size() != attributes.size()){
@@ -191,8 +191,7 @@ public class AttributeHandler {
                         }
                         Integer meta = Integer.parseInt(pair[0].trim());
                         Integer col = Integer.parseInt(pair[1].trim());
-                        dAttributes.get(col).metadata.put(dAttributes.get(meta).resource.toString(),
-                                "${"+rHeader.get(meta)+"}"+dAttributes.get(meta).datatype);
+                        dAttributes.get(col).metadata.addElement(dAttributes.get(meta));
                         dAttributes.get(meta).isMeta = true;
                     }
                 }
@@ -203,56 +202,56 @@ public class AttributeHandler {
     }
 
     // Calls API to attempt to indetify if attribute is a quantity
-    private Boolean isResourceAMeasurement(Resource r) {
-        Boolean isMes = false;
-        String query = "SELECT ?x WHERE { <"+r.toString()+"> <http://www.w3.org/2000/01/rdf-schema#label> ?x .}";
-        QueryExecution qexec = QueryExecutionFactory.create(query, model);
-        ResultSet results = qexec.execSelect();
-        for( ; results.hasNext(); ) {
-            QuerySolution soln = results.nextSolution() ;
-            Boolean m = APICall.isMeasurement(soln.getLiteral("x").toString());
-            isMes = isMes || m;
-        }
-        return isMes;
-    }
+//    private Boolean isResourceAMeasurement(Resource r) {
+//        Boolean isMes = false;
+//        String query = "SELECT ?x WHERE { <"+r.toString()+"> <http://www.w3.org/2000/01/rdf-schema#label> ?x .}";
+//        QueryExecution qexec = QueryExecutionFactory.create(query, model);
+//        ResultSet results = qexec.execSelect();
+//        for( ; results.hasNext(); ) {
+//            QuerySolution soln = results.nextSolution() ;
+//            Boolean m = APICall.isMeasurement(soln.getLiteral("x").toString());
+//            isMes = isMes || m;
+//        }
+//        return isMes;
+//    }
 
     // function to get name of unit if measurement indentified for attribute
-    public Vector<Attribute> getUnits(Vector<String> rHeader,
-                                      Vector<String> header,
+    public Vector<Attribute> getUnits(Vector<String> header,
                                       Vector<Attribute> attributes,
                                       Vector<String> firstrow) {
-        final String UNIT = "http://umkc.edu/unit";
+//        final String UNIT = "http://umkc.edu/unit";
         Vector<Attribute> attrsWithUnits = new Vector<Attribute>(attributes.size());
         try {
-            Vector<Attribute> tmp = checkDependency(rHeader, header, attributes, firstrow);
+            Vector<Attribute> tmp = checkDependency(header, attributes, firstrow);
             for(int i = 0; i < tmp.size(); i++) {
                 Attribute a = tmp.get(i);
-                if(!a.isMeta && !a.hasMetaData()) {
-                    String query = "SELECT ?x WHERE { "+"<"+a.resource.toString()+">"+" <http://umkc.edu/unit> ?x .}";
-                    QueryExecution qexec = QueryExecutionFactory.create(query, model);
-                    ResultSet results = qexec.execSelect();
-                    if (!results.hasNext()) {
-                        Boolean measurement = isResourceAMeasurement(a.resource);
-                        if(measurement) { // Gets unit from user, adds to graph and attribute
-                            System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
-                            System.out.print("Please enter the unit name (input NA if not a measurement): ");
-                            Scanner s = new Scanner(System.in);
-                            if (!s.nextLine().equals("NA")) {
-                                String unit = formatAttribute(s.nextLine().trim());
-                                createTriple(a.resource, UNIT, unit);
-                                a.metadata.put(UNIT, unit);
-                            }
-                        }
-                    }
-                    else {
-                        // TODO: Expand this to let user choose which literal if multi results returned
-                        QuerySolution solution = results.nextSolution();
-                        Literal unitlit = solution.getLiteral("x");
-                        String unitstr = unitlit.toString();
-                        a.metadata.put(UNIT,unitstr);
-                    }
-                    System.out.print("Col " + i + " processed\n");
+//                if(!a.isMeta && !a.hasMetaData()) {
+                String query = "SELECT ?x WHERE { "+"<"+a.resource.toString()+">"+" <http://umkc.edu/unit> ?x .}";
+                QueryExecution qexec = QueryExecutionFactory.create(query, model);
+                ResultSet results = qexec.execSelect();
+//                    if (!results.hasNext()) {
+////                        Boolean measurement = isResourceAMeasurement(a.resource);
+//                        if(measurement) { // Gets unit from user, adds to graph and attribute
+//                            System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
+//                            System.out.print("Please enter the unit name (input NA if not a measurement): ");
+//                            Scanner s = new Scanner(System.in);
+//                            if (!s.nextLine().equals("NA")) {
+//                                String unit = formatAttribute(s.nextLine().trim());
+//                                createTriple(a.resource, UNIT, unit);
+//                                a.metadata.put(UNIT, unit);
+//                            }
+//                        }
+//                    }
+//                    else {
+                // TODO: Expand this to let user choose which literal if multi results returned
+                if (results.hasNext()) {
+                    QuerySolution solution = results.nextSolution();
+                    Literal unitlit = solution.getLiteral("x");
+                    String unitstr = unitlit.toString();
+                    a.unit = unitstr;
                 }
+//                    }
+                System.out.print("Col " + i + " processed\n");
                 attrsWithUnits.add(a);
             }
         }
