@@ -12,6 +12,7 @@ import java.util.Vector;
 /**
  * Created by brendan on 8/13/17.
  */
+
 public class TemplateHandler {
     // Potentially move create template function here
     // Functions:
@@ -56,27 +57,27 @@ public class TemplateHandler {
 
     //TODO: implement saving the graph template then move to searching graph for existing templates
     // search for template and if found save to file and update template graph
-    boolean templateFound(Vector<Attribute> header, String filepath) {
+    boolean templateFound(Vector<Entity> header, String filepath) {
 
         return false;
     }
 
-    private String getMeta(String baseEntity, Attribute currentEntity, CSVRecord header, Integer index, Resource metaAnon) {
+    private String getMeta(String baseEntity, Entity currentEntity, CSVRecord header, Integer index, Resource metaAnon) {
         StringBuilder accstring = new StringBuilder();
         String anonNode = "_:metadata"+Integer.toString(index);
-        createPredicate(metaAnon, "http://umkc.edu/valueAttribute", currentEntity.resource);
-        accstring.append(baseEntity + " <" + currentEntity.resource + "> "+ anonNode +" .\n");
+        createPredicate(metaAnon, "http://umkc.edu/valueAttribute", currentEntity.getResource());
+        accstring.append(baseEntity + " <" + currentEntity.getResource() + "> "+ anonNode +" .\n");
         accstring.append(anonNode + " <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> " +
                 "\"${" + header.get(index).trim() + "}\"" + currentEntity.datatype + " .\n");
-        for (Attribute meta : currentEntity.metadata) {
+        for (Entity meta : currentEntity.getMetadata()) {
             if (meta.hasMetaData()) {
                 Resource nextmeta = model.createResource();
-                createPredicate(metaAnon, "http://umkc.edu/attributeWithMeta", nextmeta);
+                createPredicate(metaAnon, "http://umkc.edu/metaAttributeWithMeta", nextmeta);
                 accstring.append(getMeta(anonNode, meta, header, meta.index, nextmeta));
             }
             else { // add all entities w/o metadata to anon node
-                createPredicate(metaAnon, "http://umkc.edu/metaAttribute", meta.resource);
-                accstring.append(anonNode + " <" + meta.resource + "> \"${" +
+                createPredicate(metaAnon, "http://umkc.edu/metaAttribute", meta.getResource());
+                accstring.append(anonNode + " <" + meta.getResource() + "> \"${" +
                         header.get(meta.index).trim() + "}\""+ meta.datatype +" .\n");
             }
 
@@ -91,9 +92,9 @@ public class TemplateHandler {
             String filepath = dirname + "/" + filename;
             Vector<String> fmtheader = CSVConverter.getFormattedHeader(filepath);
             Vector<String> dataRow = CSVConverter.getFirstDataRow(filepath);
-            AttributeHandler ah = new AttributeHandler(graphname);
-            Vector<Attribute> aData = ah.addDataType(dataRow, ah.findAttributes(fmtheader, dataRow));
-            Vector<Attribute> aMeta = ah.getUnits(fmtheader, aData, dataRow);
+            EntityHandler ah = new EntityHandler(graphname);
+            Vector<Entity> aData = ah.addDataType(dataRow, ah.findEntities(fmtheader, dataRow));
+            Vector<Entity> aMeta = ah.getUnits(fmtheader, aData, dataRow);
 
             // If previous template not found and used, then ask user for template structure
             if (!templateFound(aMeta, filepath)) {
@@ -128,7 +129,7 @@ public class TemplateHandler {
                         throw new Exception("Outside of column index range");
                     }
                     subjectcols.add(num);
-                    createPredicate(tempAnonNode, "http://umkc.edu/subject", aMeta.get(num).resource);
+                    createPredicate(tempAnonNode, "http://umkc.edu/subject", aMeta.get(num).getResource());
                     String ent = header.get(num).trim();
                     subject.append("${" + ent + "}" + "-");
                 }
@@ -140,7 +141,7 @@ public class TemplateHandler {
                 if (subjectcols.size() > 1) {
                     allTrips.append(subject.toString() + " " + MADEOF + " _:comp . \n");
                     for (Integer n : subjectcols) {
-                        allTrips.append("_:comp <" + aMeta.get(n).resource.toString() + "> \"${"
+                        allTrips.append("_:comp <" + aMeta.get(n).toString() + "> \"${"
                                 + header.get(n) + "}\" . \n");
                     }
                 }
@@ -150,22 +151,22 @@ public class TemplateHandler {
                 allTrips.append(subject.toString() + " " + GROUPEDREC + " " + subjectnode + " . \n");
 
 //            for (Integer n : subjects) {
-//               allTrips.append("<" + aMeta.get(n).resource + "> <http://www.w3.org/2001/XMLSchema#literal> \"${" +
+//               allTrips.append("<" + aMeta.get(n).getResource() + "> <http://www.w3.org/2001/XMLSchema#literal> \"${" +
 //                       header.get(n) + "}\" .\n");
 //            }
 
                 for (int i = 0; i < aMeta.size(); i++) {
-                    Attribute a = aMeta.get(i);
-                    if (subjectcols.contains(i) || (a.isMeta)) {
+                    Entity e = aMeta.get(i);
+                    if (subjectcols.contains(i) || (e.isMetaEntity())) {
                         continue;
                     }
                     // add any anonymous node for metadata
-                    else if (a.hasMetaData()) {
+                    else if (e.hasMetaData()) {
                         Resource metaAnon = model.createResource();
                         createPredicate(tempAnonNode, "http://umkc.edu/attributeWithMeta", metaAnon);
-                        String metastruct = getMeta(subjectnode, a, headerRecord, i, metaAnon);
+                        String metastruct = getMeta(subjectnode, e, headerRecord, i, metaAnon);
                         allTrips.append(metastruct);
-//                    allTrips.append(subject.toString() + " <" + a.resource + "> _:metadata" + i +" .\n");
+//                    allTrips.append(subject.toString() + " <" + a.getResource() + "> _:metadata" + i +" .\n");
 //                    allTrips.append("_:metadata" + i + " <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> " +
 //                            "\"${" + headerRecord.get(i).trim() + "}\"" + a.datatype + " .\n");
 //                    for (String k : a.metadata.keySet()) {
@@ -173,9 +174,9 @@ public class TemplateHandler {
 //                                "\" .\n");
 //                    }
                     } else {
-                        createPredicate(tempAnonNode,"http://umkc.edu/attribute", a.resource);
-                        allTrips.append(subjectnode + " <" + a.resource + "> \"${" +
-                                headerRecord.get(i).trim() + "}\"" + a.datatype + " .\n");
+                        createPredicate(tempAnonNode,"http://umkc.edu/attribute", e.getResource());
+                        allTrips.append(subjectnode + " <" + e.getResource() + "> \"${" +
+                                headerRecord.get(i).trim() + "}\"" + e.datatype + " .\n");
                     }
                 }
 
@@ -194,8 +195,8 @@ public class TemplateHandler {
             }
         }
 
-        catch(Exception e) {
-            e.printStackTrace();
+        catch(Exception exc) {
+            exc.printStackTrace();
         }
     }
 }

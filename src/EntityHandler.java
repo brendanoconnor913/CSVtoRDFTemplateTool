@@ -12,18 +12,18 @@ import java.util.Vector;
 /**
  * Created by brendan on 10/30/16.
  */
-public class AttributeHandler {
+public class EntityHandler {
     private Model model = ModelFactory.createDefaultModel();
     private String graphname;
 
-    AttributeHandler(String graph) {
+    EntityHandler(String graph) {
         graphname = graph; // file path to ontology graph
         model.read(graphname);
     }
 
     // takes in column header and puts in uniform format
-    public static String formatAttribute(String attr) {
-        char[] symbols = {' ','-',',','<','>','%','(',')','/','\\'};// symbols to be removed from attributes
+    public static String formatEntity(String attr) {
+        char[] symbols = {' ','-',',','<','>','%','(',')','/','\\'};// symbols to be removed from entities
         StringBuilder sb = new StringBuilder();
         // remove symbols, spaces -> _ , and convert to all lower case
         for(char c : attr.trim().toCharArray()) {
@@ -79,41 +79,41 @@ public class AttributeHandler {
         return r;
     }
 
-    private String getAttributeInput(String unidentified, String sample) {
+    private String getEntityInput(String unidentified, String sample) {
         System.out.println("\nThe system was unable to identify \"" + unidentified +
-                "\" (Sample: \"" + sample + "\")\n\t(Press ENTER if you wish to keep given attribute name)");
+                "\" (Sample: \"" + sample + "\")\n\t(Press ENTER if you wish to keep given entity name)");
         String userin;
         System.out.print(unidentified + " : ");
         Scanner s = new Scanner(System.in);
         String line = s.nextLine().trim();
-        if(line.equals("")) { // if enter inputted use old attribute
+        if(line.equals("")) { // if enter inputted use old entity
             userin = unidentified;
         }
         else {
-            userin = formatAttribute(line);
+            userin = formatEntity(line);
         }
         return userin;
     }
 
-    // Searches metagraph to try and find attribute if not found asks for user input for other possible alias
+    // Searches metagraph to try and find entity if not found asks for user input for other possible alias
     // if found attaches new and old alias to resource if not creates new alias
-    public Vector<Attribute> findAttributes(Vector<String> header, Vector<String> firstrow) {
-        Vector<Attribute> attributes = new Vector<Attribute>(header.size());
+    public Vector<Entity> findEntities(Vector<String> header, Vector<String> firstrow) {
+        Vector<Entity> entities = new Vector<Entity>(header.size());
         try {
             for(int i = 0; i < header.size(); i++) {
                 String current = header.get(i);
                 String query = "SELECT ?x WHERE { ?x <http://www.w3.org/2000/01/rdf-schema#label> \"" + current + "\".}";
                 QueryExecution qexec = QueryExecutionFactory.create(query, model);
                 ResultSet results = qexec.execSelect();
-                if (!results.hasNext()) { // attribute not identified
-                    String in = getAttributeInput(current, firstrow.get(i)); // get new attribute name and search again
+                if (!results.hasNext()) { // entity not identified
+                    String in = getEntityInput(current, firstrow.get(i)); // get new entity name and search again
                     String secondsearch = "SELECT ?x WHERE { ?x <http://www.w3.org/2000/01/rdf-schema#label> \"" + in + "\".}";
                     QueryExecution qex = QueryExecutionFactory.create(secondsearch, model);
                     ResultSet sndresult = qex.execSelect();
-                    if (!sndresult.hasNext()) { // attribute not identified
+                    if (!sndresult.hasNext()) { // entity not identified
                         Resource nr = createEntity(in);
                         createAlias(nr,current);
-                        attributes.add(new Attribute(nr,i));
+                        entities.add(new Entity(nr,i));
                     }
                     else {
                         int rescnt = 0;
@@ -127,7 +127,7 @@ public class AttributeHandler {
                             createAlias(r,current);
                             System.out.println(r + " was identified from " + in + "(originally was \""
                                     + current + "\").");
-                            attributes.add(new Attribute(r,i));
+                            entities.add(new Entity(r,i));
                             rescnt++;
                         }
                     }
@@ -141,7 +141,7 @@ public class AttributeHandler {
                         }
                         QuerySolution soln = results.nextSolution() ;
                         Resource r = soln.getResource("x");
-                        attributes.add(new Attribute(r,i));
+                        entities.add(new Entity(r,i));
                         System.out.println(r);
                         rescnt++;
                     }
@@ -151,19 +151,19 @@ public class AttributeHandler {
         catch(Exception e) {
             e.printStackTrace();
         }
-        return attributes;
+        return entities;
     }
 
     // Get input to identify if column unit dependant on another column
-    private Vector<Attribute> checkDependency(Vector<String> header,
-                                              Vector<Attribute> attributes,
+    private Vector<Entity> checkDependency(Vector<String> header,
+                                              Vector<Entity> entities,
                                               Vector<String> firstrow) throws Exception {
-        if(header.size() != attributes.size()){
-            throw new Exception("Header size needs to match attribute size... attribute may have been" +
+        if(header.size() != entities.size()){
+            throw new Exception("Header size needs to match entity size... entity may have been" +
                     " lost in process");
         }
-        // Store updates in dAttributes to be returned at the end
-        Vector<Attribute> dAttributes = (Vector<Attribute>)attributes.clone();
+        // Store updates in dEntities to be returned at the end
+        Vector<Entity> dEntities = (Vector<Entity>)entities.clone();
 
         // Output column headers
         for(int i = 0; i < header.size(); i++) {
@@ -191,17 +191,17 @@ public class AttributeHandler {
                         }
                         Integer meta = Integer.parseInt(pair[0].trim());
                         Integer col = Integer.parseInt(pair[1].trim());
-                        dAttributes.get(col).metadata.addElement(dAttributes.get(meta));
-                        dAttributes.get(meta).isMeta = true;
+                        dEntities.get(col).addMeta(dEntities.get(meta));
+                        dEntities.get(meta).setMetaEntity();
                     }
                 }
             }
         }
 
-        return dAttributes;
+        return dEntities;
     }
 
-    // Calls API to attempt to indetify if attribute is a quantity
+    // Calls API to attempt to indetify if entity is a quantity
 //    private Boolean isResourceAMeasurement(Resource r) {
 //        Boolean isMes = false;
 //        String query = "SELECT ?x WHERE { <"+r.toString()+"> <http://www.w3.org/2000/01/rdf-schema#label> ?x .}";
@@ -215,28 +215,28 @@ public class AttributeHandler {
 //        return isMes;
 //    }
 
-    // function to get name of unit if measurement indentified for attribute
-    public Vector<Attribute> getUnits(Vector<String> header,
-                                      Vector<Attribute> attributes,
+    // function to get name of unit if measurement indentified for entity
+    public Vector<Entity> getUnits(Vector<String> header,
+                                      Vector<Entity> entities,
                                       Vector<String> firstrow) {
 //        final String UNIT = "http://umkc.edu/unit";
-        Vector<Attribute> attrsWithUnits = new Vector<Attribute>(attributes.size());
+        Vector<Entity> attrsWithUnits = new Vector<Entity>(entities.size());
         try {
-            Vector<Attribute> tmp = checkDependency(header, attributes, firstrow);
+            Vector<Entity> tmp = checkDependency(header, entities, firstrow);
             for(int i = 0; i < tmp.size(); i++) {
-                Attribute a = tmp.get(i);
+                Entity e = tmp.get(i);
 //                if(!a.isMeta && !a.hasMetaData()) {
-                String query = "SELECT ?x WHERE { "+"<"+a.resource.toString()+">"+" <http://umkc.edu/unit> ?x .}";
+                String query = "SELECT ?x WHERE { "+"<"+e.toString()+">"+" <http://umkc.edu/unit> ?x .}";
                 QueryExecution qexec = QueryExecutionFactory.create(query, model);
                 ResultSet results = qexec.execSelect();
 //                    if (!results.hasNext()) {
 ////                        Boolean measurement = isResourceAMeasurement(a.resource);
-//                        if(measurement) { // Gets unit from user, adds to graph and attribute
+//                        if(measurement) { // Gets unit from user, adds to graph and entity
 //                            System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
 //                            System.out.print("Please enter the unit name (input NA if not a measurement): ");
 //                            Scanner s = new Scanner(System.in);
 //                            if (!s.nextLine().equals("NA")) {
-//                                String unit = formatAttribute(s.nextLine().trim());
+//                                String unit = formatEntity(s.nextLine().trim());
 //                                createTriple(a.resource, UNIT, unit);
 //                                a.metadata.put(UNIT, unit);
 //                            }
@@ -248,11 +248,11 @@ public class AttributeHandler {
                     QuerySolution solution = results.nextSolution();
                     Literal unitlit = solution.getLiteral("x");
                     String unitstr = unitlit.toString();
-                    a.unit = unitstr;
+                    e.unit = unitstr;
                 }
 //                    }
                 System.out.print("Col " + i + " processed\n");
-                attrsWithUnits.add(a);
+                attrsWithUnits.add(e);
             }
         }
         catch(Exception e) {
@@ -297,15 +297,15 @@ public class AttributeHandler {
         return s.contains(".");
     }
 
-    // Takes in vector of formed attributes, scans to figure out data type and attaches to given attribute
-    public Vector<Attribute> addDataType(Vector<String> dataRow, Vector<Attribute> pAttributes) throws Exception {
-        Vector<Attribute> dAttributes = (Vector<Attribute>)pAttributes.clone();
+    // Takes in vector of formed entities, scans to figure out data type and attaches to given entity
+    public Vector<Entity> addDataType(Vector<String> dataRow, Vector<Entity> pEntities) throws Exception {
+        Vector<Entity> dEntities = (Vector<Entity>)pEntities.clone();
         for(int i = 0; i < dataRow.size();i++) {
-            if (dataRow.size() != dAttributes.size()) {
-                throw new Exception("Vector sizes don't match in data and attributes");
+            if (dataRow.size() != dEntities.size()) {
+                throw new Exception("Vector sizes don't match in data and entities");
             }
             String s = dataRow.get(i);
-            Attribute a = dAttributes.get(i);
+            Entity a = dEntities.get(i);
 
             if (isString(s)) {
                 if (isBool(s)) {
@@ -324,6 +324,6 @@ public class AttributeHandler {
                 }
             }
         }
-        return dAttributes;
+        return dEntities;
     }
 }

@@ -32,7 +32,7 @@ public class CSVConverter {
             Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
             CSVRecord headerRecord = recordForHeader.iterator().next();
             for(int i = 0; i < headerRecord.size(); i++) {
-                String s = AttributeHandler.formatAttribute(headerRecord.get(i).trim());
+                String s = EntityHandler.formatEntity(headerRecord.get(i).trim());
                 header.add(s);
             }
             in.close();
@@ -262,7 +262,7 @@ public class CSVConverter {
         String graphname = args[1];
         String templategraph = args[2];
         CSVConverter converter = new CSVConverter();
-        CSV2RDF templateToRDF = new CSV2RDF(true);
+        Template2RDF templateToRDF = new Template2RDF(true);
         File dir = new File(dirname);
         IdentityChecker ic = new IdentityChecker();
         TemplateHandler handler = new TemplateHandler(templategraph);

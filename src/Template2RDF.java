@@ -56,13 +56,13 @@ import com.google.common.io.Files;
  * @author Evren Sirin
  */
 //@Command(name = "convert", description = "Runs the conversion.")
-public class CSV2RDF {
+public class Template2RDF {
 	private static final Charset INPUT_CHARSET = Charset.defaultCharset();
 	private static final Charset OUTPUT_CHARSET = Charsets.UTF_8;
 	private static final ValueFactory FACTORY = ValueFactoryImpl.getInstance();
     private static Boolean formatvalues;
 
-    CSV2RDF(Boolean format) {
+    Template2RDF(Boolean format) {
         formatvalues = format; // will format values insserted into strings if true
     }
 
@@ -322,7 +322,7 @@ public class CSV2RDF {
 
 		protected String provideValue(int rowIndex, String[] row) {
 			if (subjIndices.contains(colIndex)) {
-				return AttributeHandler.formatAttribute(row[colIndex]);
+				return EntityHandler.formatEntity(row[colIndex]);
 			}
 			else {
 				return row[colIndex];
