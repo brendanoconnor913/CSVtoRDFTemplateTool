@@ -1,12 +1,10 @@
+import java.util.Iterator;
 import java.util.Vector;
 import org.apache.jena.query.QueryExecution;
 import org.apache.jena.query.QueryExecutionFactory;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
-import org.apache.jena.rdf.model.Literal;
-import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.Resource;
-import org.apache.jena.rdf.model.Model;
+import org.apache.jena.rdf.model.*;
 
 /**
  * Created by brendan on 8/17/17.
@@ -19,34 +17,18 @@ public class RDFTemplate {
     private Model model;
 
     private Integer getObservations(Resource tempnode) throws Exception {
-        String query = "SELECT ?x WHERE { "+ tempnode.toString() +" <http://umkc.edu/numObservations> ?x .}";
-        QueryExecution qexec = QueryExecutionFactory.create(query, model);
-        ResultSet result = qexec.execSelect();
-        if (result.hasNext()) { // attribute not identified
-            QuerySolution soln = result.nextSolution() ;
-            Literal l = soln.getLiteral("x");
-            return l.getInt();
-
-        } else { throw new Exception("No found observations"); }
+        // each template should only have one observation node
+        StmtIterator itr = tempnode.listProperties(model.getProperty("http://umkc.edu/numObservations"));
+        Literal observations = itr.nextStatement().getObject().asLiteral();
+        return observations.getInt();
     }
 
-    // change back to private later
     private Vector<Entity> getResults(Resource basenode, String pred) {
-        String query;
-        if (basenode.isAnon()) {
-            query = "SELECT ?x WHERE { _:"+basenode.toString()+" <"+pred+"> ?x .}";
-        }
-        else {
-            query = "SELECT ?x WHERE { "+basenode.toString()+" <"+pred+"> ?x .}";
-        }
         Vector<Entity> outresults = new Vector<Entity>();
-        QueryExecution qexec = QueryExecutionFactory.create(query, model);
-        ResultSet result = qexec.execSelect();
-        while (result.hasNext()) {
-            QuerySolution soln = result.nextSolution() ;
-            Resource r = soln.getResource("x");
-            System.out.println(r.toString());
-            outresults.add(new Entity(r));
+        StmtIterator itr = basenode.listProperties(model.getProperty(pred));
+        while (itr.hasNext()) {
+            Resource result = itr.nextStatement().getObject().asResource();
+            outresults.add(new Entity(result));
         }
         return outresults;
     }
@@ -58,13 +40,36 @@ public class RDFTemplate {
     }
 
     // called on each attributeWithMeta anon node
+    // TODO: keep getting valueattribute from multiple anon nodes, need to figure out
     private Entity getMetaAttributes(Resource basenode) throws Exception {
         // valueAttribute will only appear once for each base meta node
-        System.out.println(basenode.toString());
         Vector<Entity> value = getResults(basenode, "http://umkc.edu/valueAttribute");
+//        Vector<Entity> value = new Vector<Entity>();
+//        String query = "SELECT * WHERE { ?x <http://umkc.edu/attributeWithMeta> ?s ." +
+//                                        "?s <http://umkc.edu/valueAttribute> ?o . }";
+//        QueryExecution qexec = QueryExecutionFactory.create(query, model);
+//        ResultSet result = qexec.execSelect();
+//
+//        while(result.hasNext()){
+//            try {
+//                QuerySolution soln = result.nextSolution() ;
+//                Resource x = soln.getResource("x");
+//                Resource s = soln.getResource("s");
+//                Resource o = soln.getResource("o");
+//                System.out.println("base:"+basenode.toString());
+//                System.out.println("x: "+x.toString()+" s: "+s.toString()+" o: "+o.toString());
+//                if (s.equals(basenode)) {
+//                    value.add(new Entity(o));
+//                    break;
+//                }
+//            }
+//            catch (Exception e) {}
+//        }
+
         if (value.size() != 1) {
-//            for (Entity e : value) { System.out.println(value.toString());}
-                throw new Exception("Invalid number of values");
+            System.out.println("FAILED");
+            for (Entity e : value) { System.out.println(e.toString());}
+            throw new Exception("Invalid number of values");
         }
         Entity valueAttribute = value.firstElement(); // get value entity
 
@@ -85,22 +90,23 @@ public class RDFTemplate {
     }
 
     private Vector<Entity> getAttributes(Resource tempnode) throws Exception {
-        Vector<Entity> tAttributes = getResults(tempnode, "http://umkc.edu/attribute");
-
-        String metaquery = "SELECT ?x WHERE { "+ tempnode.toString() +" <http://umkc.edu/attributeWithMeta> ?x .}";
-        QueryExecution qmetaexec = QueryExecutionFactory.create(metaquery, model);
-        ResultSet metaresult = qmetaexec.execSelect();
-        while (metaresult.hasNext()) {
-            QuerySolution metasoln = metaresult.nextSolution();
-            Resource metar = metasoln.getResource("x");
-            System.out.println(metar.toString());
+        Vector<Entity> tAttributes = new Vector<Entity>();
+        StmtIterator itr = tempnode.listProperties(model.getProperty("http://umkc.edu/attributeWithMeta"));
+        while (itr.hasNext()) {
+            Resource metar = itr.nextStatement().getObject().asResource();
             Entity e = getMetaAttributes(metar);
             tAttributes.add(getMetaAttributes(metar));
+            // testing output, delete later
             for (Entity me : e.getMetadata()) {
-                System.out.println(me.toString());
+                System.out.println("META: "+me.toString());
+                if (me.hasMetaData()) {
+                    for (Entity mm : me.getMetadata()){
+                        System.out.println("MM: "+mm.toString());
+                    }
+                }
             }
         }
-        if (tAttributes.isEmpty()) {throw new Exception("No subject found");}
+        if (tAttributes.isEmpty()) {throw new Exception("No attributes found");}
         return tAttributes;
     }
 
@@ -119,7 +125,17 @@ public class RDFTemplate {
     public static void main(String args[]) {
         Model model = ModelFactory.createDefaultModel();
         model.read("templates.nt");
-        RDFTemplate template = new RDFTemplate(model.getResource("_:Be7fa923X3A15e065ee4c0X3AX2D7fff"), model);
+        String query;
+        query = "SELECT ?s ?x WHERE { ?s <http://umkc.edu/numObservations> ?x . }";
+        QueryExecution qexec = QueryExecutionFactory.create(query, model);
+        ResultSet result = qexec.execSelect();
+        while (result.hasNext()) {
+            System.out.println("new temp");
+            QuerySolution soln = result.nextSolution();
+            Resource s = soln.getResource("s");
+            new RDFTemplate(s, model);
+        }
+
     }
 
 //    Boolean isEqual(RDFTemplate t2) {};

@@ -12,6 +12,7 @@
             <id>jitpack.io</id>
             <url>https://jitpack.io</url>
         </repository>
+
     </repositories>
 
     <dependencies>
@@ -49,11 +50,11 @@
             <version>2.6</version>
         </dependency>
 
-        <!--<dependency>-->
-            <!--<groupId>dnl.utils</groupId>-->
-            <!--<artifactId>j-text-utils</artifactId>-->
-            <!--<version>0.3.3</version>-->
-        <!--</dependency>-->
+        <dependency>
+            <groupId>com.massisframework</groupId>
+            <artifactId>j-text-utils</artifactId>
+            <version>0.3.4</version>
+        </dependency>
 
         <!-- &lt;!&ndash; https://mvnrepository.com/artifact/com.hp.hpl.jena/jena &ndash;&gt;
          <dependency>
