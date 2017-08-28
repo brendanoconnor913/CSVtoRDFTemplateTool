@@ -1,3 +1,4 @@
+import dnl.utils.text.table.TextTable;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
 import org.apache.jena.rdf.model.Model;
@@ -14,189 +15,160 @@ import java.util.Vector;
  */
 
 public class TemplateHandler {
-    // Potentially move create template function here
-    // Functions:
-    //      Search Previous Templates given column headers
-    //      Save new template to template graph
-    //
-    private Model model = ModelFactory.createDefaultModel();
-    private String graphname;
-    private List<Integer> subjectcols = new Vector<Integer>();
+    private String templateGraph;
 
     TemplateHandler(String graph) {
-        graphname = graph; // file path to template graph
-        model.read(graphname);
-    }
-
-    private void writeToModel() {
-        try {
-            PrintWriter pw = new PrintWriter(graphname);
-            model.write(pw, "NT");
-            pw.close();
-        }
-        catch(Exception exec) {
-            exec.printStackTrace();
-        }
-    }
-
-    // adds pred,obj to subj and store in graph
-    private void createTriple(Resource r, String predicate, String object){
-        r.addProperty(ResourceFactory.createProperty(predicate),
-                ResourceFactory.createPlainLiteral(object));
-        writeToModel();
-    }
-
-    private void createPredicate(Resource s, String predicate, Resource o){
-        s.addProperty(ResourceFactory.createProperty(predicate), o);
-        writeToModel();
-    }
-
-    public List<Integer> getSubjectColumns() {
-        return subjectcols;
+        templateGraph = graph; // file path to template graph
     }
 
     //TODO: implement saving the graph template then move to searching graph for existing templates
     // search for template and if found save to file and update template graph
     boolean templateFound(Vector<Entity> header, String filepath) {
-
         return false;
     }
 
-    private String getMeta(String baseEntity, Entity currentEntity, CSVRecord header, Integer index, Resource metaAnon) {
-        StringBuilder accstring = new StringBuilder();
-        String anonNode = "_:metadata"+Integer.toString(index);
-        createPredicate(metaAnon, "http://umkc.edu/valueAttribute", currentEntity.getResource());
-        accstring.append(baseEntity + " <" + currentEntity.getResource() + "> "+ anonNode +" .\n");
-        accstring.append(anonNode + " <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> " +
-                "\"${" + header.get(index).trim() + "}\"" + currentEntity.datatype + " .\n");
-        for (Entity meta : currentEntity.getMetadata()) {
-            if (meta.hasMetaData()) {
-                Resource nextmeta = model.createResource();
-                createPredicate(metaAnon, "http://umkc.edu/metaAttributeWithMeta", nextmeta);
-                accstring.append(getMeta(anonNode, meta, header, meta.index, nextmeta));
+    private void printTable(String filepath) {
+        final int ROWS = 17;
+        try {
+            Reader in = new FileReader(filepath);
+            Iterable<CSVRecord> rows = CSVFormat.EXCEL.parse(in);
+            System.out.println("\nPreview of table:");
+            CSVRecord row = rows.iterator().next();
+            String[] cols = new String[row.size()];
+            for (int i = 0; i < row.size(); i++) {
+                cols[i] = row.get(i).trim();
             }
-            else { // add all entities w/o metadata to anon node
-                createPredicate(metaAnon, "http://umkc.edu/metaAttribute", meta.getResource());
-                accstring.append(anonNode + " <" + meta.getResource() + "> \"${" +
-                        header.get(meta.index).trim() + "}\""+ meta.datatype +" .\n");
+            String[][] data = new String[ROWS][row.size()];
+            for (int i = 0; i < ROWS; i++) {
+                row = rows.iterator().next();
+                for (int j = 0; j < row.size(); j++) {
+                    data[i][j] = row.get(j).trim();
+                }
             }
-
+            TextTable tt = new TextTable(cols, data);
+            tt.printTable();
+            in.close();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
-        return accstring.toString();
     }
 
+    // Get input to identify if column provides meta data on another column
+    private Vector<Entity> getMetaRelationships(Vector<String> header,
+                                                Vector<Entity> entities,
+                                                Vector<String> firstrow) throws Exception {
+        if(header.size() != entities.size()){
+            throw new Exception("Header size needs to match entity size... entity may have been" +
+                    " lost in process");
+        }
+        // Store updates in dEntities to be returned at the end
+        Vector<Entity> dEntities = (Vector<Entity>)entities.clone();
+
+        // Output column headers
+        for(int i = 0; i < header.size(); i++) {
+            String s = header.get(i).trim();
+            System.out.println(i + " : " + s + " (Sample: \"" + firstrow.get(i) + "\")");
+        }
+        // Get input for meta columns
+        System.out.println("\nPlease indicate if any column specifies metadata for another column");
+        System.out.println("If there aren't any metadata columns simply press enter");
+        System.out.println("The format to do so is META_COL_NUM,VAL_COL:" +
+                            "META_COL2,VAL_COL2:META_COL3,VAL_COL3\n");
+        System.out.print("Enter dependencies as instructed above: ");
+        BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+        String line = br.readLine().trim();
+        if(!line.equals("")) {
+            String[] dependencies = line.split(":");
+            if(!dependencies[0].equals("")){
+                for(int i = 0; i < dependencies.length; i++){
+                    String [] pair = dependencies[i].split(",");
+                    if(!pair[0].equals("")) {
+                        if(pair.length != 2 || (pair[0].equals(pair[1]))) {
+                            System.out.println(pair.length);
+                            System.out.println("\""+pair[0]+"\"");
+                            throw new Exception("Columns did not adhere to format given.");
+                        }
+                        Integer meta = Integer.parseInt(pair[0].trim());
+                        Integer col = Integer.parseInt(pair[1].trim());
+                        dEntities.get(col).addMeta(dEntities.get(meta));
+                        dEntities.get(meta).setMetaEntity();
+                    }
+                }
+            }
+        }
+
+        return dEntities;
+    }
+
+    Vector<Integer> getSubjectIndicies(String filepath) {
+        Vector<Integer> subjectcols = new Vector<Integer>();
+        try {
+            Reader in = new FileReader(filepath);
+            Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
+
+            CSVRecord headerRecord = recordForHeader.iterator().next();
+            printTable(filepath); // print table for help with determining subject
+            System.out.println("\nEach subject column and their respective indicies:");
+            for (int i = 0; i < headerRecord.size(); i++) {
+                String s = headerRecord.get(i).trim();
+                System.out.println(i + " : " + s);
+            }
+            System.out.println();
+
+            // get subject column index
+            // if multi indices then separate by a space\
+            System.out.print("Enter subject column(s) in the order you wish to appear: ");
+            BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
+            String[] subjectColIndexs = br.readLine().split(" ");
+            for (String subCol : subjectColIndexs) {
+                int num = Integer.parseInt(subCol);
+                // make sure in range
+                if (num < 0 || num >= headerRecord.size()) {
+                    throw new Exception("Outside of column index range");
+                }
+                subjectcols.add(num);
+            }
+        }
+        catch (Exception e) {e.printStackTrace();}
+        return subjectcols;
+    }
+
+
     // writes template for csv file to template file and saves template structure
-    public void createTemplate(String filename, String graphname, String dirname) {
+    public Vector<Integer> createTemplateFile(String dirname, String filename, String ontologyGraph) {
+        Vector<Integer> subjectIndicies = new Vector<Integer>();
         try {
             // process column headers (map to resources and gather metadata)
             String filepath = dirname + "/" + filename;
             Vector<String> fmtheader = CSVConverter.getFormattedHeader(filepath);
+            Vector<String> rawheader = CSVConverter.getHeader(filepath);
             Vector<String> dataRow = CSVConverter.getFirstDataRow(filepath);
-            EntityHandler ah = new EntityHandler(graphname);
-            Vector<Entity> aData = ah.addDataType(dataRow, ah.findEntities(fmtheader, dataRow));
-            Vector<Entity> aMeta = ah.getUnits(fmtheader, aData, dataRow);
+            EntityHandler eh = new EntityHandler(ontologyGraph);
+            Vector<Entity> aData = eh.addDataType(dataRow, eh.findEntities(fmtheader, dataRow, rawheader));
 
             // If previous template not found and used, then ask user for template structure
-            if (!templateFound(aMeta, filepath)) {
-                Resource tempAnonNode = model.createResource();
-                createTriple(tempAnonNode, "http://umkc.edu/numObservations", "1");
-                // get header row
-                Reader in = new FileReader(filepath);
-                Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
-
-                CSVRecord headerRecord = recordForHeader.iterator().next();
-                Vector<String> header = new Vector<String>();
-                CSVConverter.printTable(filepath); // print table for help with determining subject
-                System.out.println("\nEach subject column and their respective indicies:");
-                for (int i = 0; i < headerRecord.size(); i++) {
-                    String s = headerRecord.get(i).trim();
-                    header.add(s);
-                    System.out.println(i + " : " + s);
-                }
-                System.out.println();
-
-                // get subject column index
-                // if multi indices then separate by a space\
-                System.out.print("Enter subject column(s) in the order you wish to appear: ");
-                BufferedReader br = new BufferedReader(new InputStreamReader(System.in));
-                String[] subjectColIndexs = br.readLine().split(" ");
-                StringBuilder subject = new StringBuilder();
-                subject.append("<http://umkc.edu/subject/");
-                for (String subCol : subjectColIndexs) {
-                    int num = Integer.parseInt(subCol);
-                    // make sure in range
-                    if (num < 0 || num >= headerRecord.size()) {
-                        throw new Exception("Outside of column index range");
+            if (!templateFound(aData, filepath)) {
+                Vector<Entity> aMeta = getMetaRelationships(fmtheader, aData, dataRow);
+                Vector<Entity> subject = new Vector<Entity>();
+                Vector<Entity> attributes = new Vector<Entity>();
+                subjectIndicies = getSubjectIndicies(filepath);
+                for(Integer i = 0; i < aMeta.size()-1; i++) {
+                    if (subjectIndicies.contains(i)) {
+                        subject.add(aMeta.get(i));
                     }
-                    subjectcols.add(num);
-                    createPredicate(tempAnonNode, "http://umkc.edu/subject", aMeta.get(num).getResource());
-                    String ent = header.get(num).trim();
-                    subject.append("${" + ent + "}" + "-");
-                }
-                subject.deleteCharAt(subject.length() - 1); // final subject string
-                subject.append(">");
-
-                StringBuilder allTrips = new StringBuilder();
-                final String MADEOF = "<http://umkc.edu/composedOf>";
-                if (subjectcols.size() > 1) {
-                    allTrips.append(subject.toString() + " " + MADEOF + " _:comp . \n");
-                    for (Integer n : subjectcols) {
-                        allTrips.append("_:comp <" + aMeta.get(n).toString() + "> \"${"
-                                + header.get(n) + "}\" . \n");
+                    else {
+                        attributes.add(aMeta.get(i));
                     }
                 }
 
-                final String subjectnode = "_:subject";
-                final String GROUPEDREC = "<http://umkc.edu/groupedRecord>";
-                allTrips.append(subject.toString() + " " + GROUPEDREC + " " + subjectnode + " . \n");
-
-//            for (Integer n : subjects) {
-//               allTrips.append("<" + aMeta.get(n).getResource() + "> <http://www.w3.org/2001/XMLSchema#literal> \"${" +
-//                       header.get(n) + "}\" .\n");
-//            }
-
-                for (int i = 0; i < aMeta.size(); i++) {
-                    Entity e = aMeta.get(i);
-                    if (subjectcols.contains(i) || (e.isMetaEntity())) {
-                        continue;
-                    }
-                    // add any anonymous node for metadata
-                    else if (e.hasMetaData()) {
-                        Resource metaAnon = model.createResource();
-                        createPredicate(tempAnonNode, "http://umkc.edu/attributeWithMeta", metaAnon);
-                        String metastruct = getMeta(subjectnode, e, headerRecord, i, metaAnon);
-                        allTrips.append(metastruct);
-//                    allTrips.append(subject.toString() + " <" + a.getResource() + "> _:metadata" + i +" .\n");
-//                    allTrips.append("_:metadata" + i + " <http://www.w3.org/1999/02/22-rdf-syntax-ns#value> " +
-//                            "\"${" + headerRecord.get(i).trim() + "}\"" + a.datatype + " .\n");
-//                    for (String k : a.metadata.keySet()) {
-//                        allTrips.append("_:metadata" + i + " <" + k + "> \"" + a.metadata.get(k) +
-//                                "\" .\n");
-//                    }
-                    } else {
-                        createPredicate(tempAnonNode,"http://umkc.edu/attribute", e.getResource());
-                        allTrips.append(subjectnode + " <" + e.getResource() + "> \"${" +
-                                headerRecord.get(i).trim() + "}\"" + e.datatype + " .\n");
-                    }
-                }
-
-                String noSuffix = CSVConverter.stripFileExtension(filename);
-
-                File tempdir = new File("output-templates");
-                if (!tempdir.exists()) {
-                    tempdir.mkdir();
-                }
-
-                File outfile = new File(tempdir, noSuffix + "-template.nt");
-                PrintStream out = new PrintStream(new FileOutputStream(outfile));
-                out.print(allTrips.toString());
-                out.close();
-                in.close();
+                RDFTemplate template = new RDFTemplate(subject, attributes, templateGraph);
+                template.writeToTemplateFile(filename);
             }
         }
 
         catch(Exception exc) {
             exc.printStackTrace();
         }
+        return subjectIndicies;
     }
 }

@@ -12,24 +12,27 @@ public class Entity {
     private Resource resource;
     private Boolean isMeta;
     public String datatype;
-    public String unit;
-    public Integer index;
+//    public String unit;
+    private String csvAlias;
+
     // If empty no metadata, all integers are column indicies of metdata for this attribute
     private Vector<Entity> metadata = new Vector<Entity>();
-    Entity(Resource r, Integer indx) {
+    // Entity created from csv file
+    Entity(Resource r, String alias) {
         resource = r;
         isMeta = false;
         datatype = "";
-        unit = "";
-        index = indx;
+        csvAlias = alias;
+        //unit = "";
     }
-
+    // Entity created from saved graph
     Entity(Resource r) {
         isMeta = false;
         resource = r;
     }
 
     public String   toString() {return resource.toString();}
+    public String   getCSVAlias() {return csvAlias;}
     public void     addMeta(Entity metaEnt) {metadata.addElement(metaEnt);}
 //    public void     addMetaList(Vector<Entity> metaList) {metadata.addAll(metaList);}
     public Boolean  isMetaEntity() {return isMeta;}
