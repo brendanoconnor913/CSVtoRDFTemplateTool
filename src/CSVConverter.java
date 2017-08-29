@@ -12,7 +12,6 @@ import java.util.Vector;
  */
 
 //TODO: Modify to seperately ask for units
-//TODO: Modify to ask for subject first?
 
 public class CSVConverter {
     // function to return vector containing header for each column
@@ -68,7 +67,6 @@ public class CSVConverter {
         try {
             Reader in = new FileReader(fname);
             Iterable<CSVRecord> recordForHeader = CSVFormat.EXCEL.parse(in);
-            CSVRecord headerRecord = recordForHeader.iterator().next();
             CSVRecord dataRecord = recordForHeader.iterator().next();
             for(int i = 0; i < dataRecord.size(); i++) {
                 String s = dataRecord.get(i).trim();

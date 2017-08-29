@@ -90,8 +90,9 @@ public class TemplateHandler {
                         }
                         Integer meta = Integer.parseInt(pair[0].trim());
                         Integer col = Integer.parseInt(pair[1].trim());
-                        dEntities.get(col).addMeta(dEntities.get(meta));
-                        dEntities.get(meta).setMetaEntity();
+                        Entity e = dEntities.get(meta);
+                        e.setMetaEntity();
+                        dEntities.get(col).addMeta(e);
                     }
                 }
             }
@@ -152,7 +153,7 @@ public class TemplateHandler {
                 Vector<Entity> subject = new Vector<Entity>();
                 Vector<Entity> attributes = new Vector<Entity>();
                 subjectIndicies = getSubjectIndicies(filepath);
-                for(Integer i = 0; i < aMeta.size()-1; i++) {
+                for(Integer i = 0; i < aMeta.size(); i++) {
                     if (subjectIndicies.contains(i)) {
                         subject.add(aMeta.get(i));
                     }
@@ -163,6 +164,7 @@ public class TemplateHandler {
 
                 RDFTemplate template = new RDFTemplate(subject, attributes, templateGraph);
                 template.writeToTemplateFile(filename);
+                template.writeToTemplateGraph();
             }
         }
 

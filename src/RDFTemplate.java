@@ -21,6 +21,7 @@ public class RDFTemplate {
     private Model templategraph  = ModelFactory.createDefaultModel();
     private String graphname;
     private Boolean newTemplate;
+    private Resource templatenode;
 
     private void writeToModel() {
         try {
@@ -121,6 +122,7 @@ public class RDFTemplate {
         graphname = graph;
         templategraph.read(graphname);
         newTemplate = false;
+        templatenode = tempnode;
         try {
             subject = getSubject(tempnode);
             attributes = getAttributes(tempnode);
@@ -175,15 +177,15 @@ public class RDFTemplate {
     }
 
     public void writeToTemplateGraph() {
-        Resource tempAnonNode = templategraph.createResource();
-        // TODO: if existing graph need to update observations
         if (!newTemplate) {
-            // update observations (+1)
+            templatenode.removeAll(templategraph.getProperty("http://umkc.edu/numObservations"));
+            createTriple(templatenode,"http://umkc.edu/numObservations", Integer.toString(observations+1));
             writeToModel();
             return;
         }
-        createTriple(tempAnonNode, "http://umkc.edu/numObservations", observations.toString());
 
+        Resource tempAnonNode = templategraph.createResource();
+        createTriple(tempAnonNode, "http://umkc.edu/numObservations", observations.toString());
         try {
             for (Entity e : subject) {
                 createPredicate(tempAnonNode, "http://umkc.edu/subject", e.getResource());

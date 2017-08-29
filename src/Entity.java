@@ -33,7 +33,10 @@ public class Entity {
 
     public String   toString() {return resource.toString();}
     public String   getCSVAlias() {return csvAlias;}
-    public void     addMeta(Entity metaEnt) {metadata.addElement(metaEnt);}
+    public void     addMeta(Entity metaEnt) {
+        metaEnt.setMetaEntity();
+        metadata.addElement(metaEnt);
+    }
 //    public void     addMetaList(Vector<Entity> metaList) {metadata.addAll(metaList);}
     public Boolean  isMetaEntity() {return isMeta;}
     public Vector<Entity> getMetadata() { return metadata;}
