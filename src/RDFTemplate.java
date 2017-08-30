@@ -1,4 +1,5 @@
 import java.io.*;
+import java.util.HashSet;
 import java.util.Vector;
 
 import dnl.utils.text.table.TextTable;
@@ -22,6 +23,32 @@ public class RDFTemplate {
     private String graphname;
     private Boolean newTemplate;
     private Resource templatenode;
+
+    // Template constructor from previously saved template
+    RDFTemplate(Resource tempnode, String graph) {
+        graphname = graph;
+        templategraph.read(graphname);
+        newTemplate = false;
+        templatenode = tempnode;
+        try {
+            subject = getSubject(tempnode);
+            attributes = getAttributes(tempnode);
+            observations = getObservations(tempnode);
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+
+    // Constructor for newly created template
+    RDFTemplate(Vector<Entity> nSubject, Vector<Entity> nAttributes, String graph) {
+        subject = nSubject;
+        attributes = nAttributes;
+        observations = 1;
+        graphname = graph;
+        templategraph.read(graphname);
+        newTemplate = true;
+    }
 
     private void writeToModel() {
         try {
@@ -51,6 +78,43 @@ public class RDFTemplate {
         StmtIterator itr = tempnode.listProperties(templategraph.getProperty("http://umkc.edu/numObservations"));
         Literal observations = itr.nextStatement().getObject().asLiteral();
         return observations.getInt();
+    }
+
+    Integer getSubjectSize() {return subject.size();}
+
+    Vector<Entity> getTemplateSubject() {return subject;}
+
+    Boolean sameEntities(Vector<Entity> header) {
+        HashSet<String> allEntities = new HashSet<String>();
+        Vector<Entity> newSub = new Vector<Entity>();
+        Vector<Entity> newAttr = new Vector<Entity>();
+
+        for (Entity e : subject) {
+            allEntities.add(e.toString());
+        }
+        HashSet<String> headerEntities = new HashSet<String>();
+        for (Entity e : header) {
+            String estr = e.toString();
+            // allEntities only subjects for now
+            if (allEntities.contains(estr)) {
+                newSub.add(e);
+            }
+            else {
+                newAttr.add(e);
+            }
+            headerEntities.add(estr);
+        }
+
+        for (Entity e : attributes) {
+            allEntities.add(e.toString());
+        }
+
+        Boolean same =  allEntities.equals(headerEntities);
+        if (same) {
+            subject = newSub;
+            attributes = newAttr;
+        }
+        return same;
     }
 
     private Vector<Entity> getResults(Resource basenode, String pred) {
@@ -98,49 +162,14 @@ public class RDFTemplate {
 
     private Vector<Entity> getAttributes(Resource tempnode) throws Exception {
         Vector<Entity> tAttributes = new Vector<Entity>();
-        StmtIterator itr = tempnode.listProperties(templategraph.getProperty("http://umkc.edu/attributeWithMeta"));
+        StmtIterator itr = tempnode.listProperties(templategraph.getProperty("http://umkc.edu/attribute"));
         while (itr.hasNext()) {
-            Resource metar = itr.nextStatement().getObject().asResource();
-            Entity e = getMetaAttributes(metar);
-            tAttributes.add(getMetaAttributes(metar));
-            // testing output, delete later
-            for (Entity me : e.getMetadata()) {
-                System.out.println("META: "+me.toString());
-                if (me.hasMetaData()) {
-                    for (Entity mm : me.getMetadata()){
-                        System.out.println("MM: "+mm.toString());
-                    }
-                }
-            }
+            Resource attr = itr.nextStatement().getObject().asResource();
+//            Entity e = getMetaAttributes(metar);
+            tAttributes.add(new Entity(attr));
         }
         if (tAttributes.isEmpty()) {throw new Exception("No attributes found");}
         return tAttributes;
-    }
-
-    // Template constructor from previously saved template
-    RDFTemplate(Resource tempnode, String graph) {
-        graphname = graph;
-        templategraph.read(graphname);
-        newTemplate = false;
-        templatenode = tempnode;
-        try {
-            subject = getSubject(tempnode);
-            attributes = getAttributes(tempnode);
-            observations = getObservations(tempnode);
-        }
-        catch (Exception e) {
-            e.printStackTrace();
-        }
-    }
-
-    // Constructor for newly created template
-    RDFTemplate(Vector<Entity> nSubject, Vector<Entity> nAttributes, String graph) {
-        subject = nSubject;
-        attributes = nAttributes;
-        observations = 1;
-        graphname = graph;
-        templategraph.read(graphname);
-        newTemplate = true;
     }
 
     private void writeMetaNodes(Entity currentEntity,  Resource metaAnon) {
@@ -192,16 +221,16 @@ public class RDFTemplate {
             }
 
             for (Entity e : attributes) {
-                if (e.isMetaEntity()) {
-                    continue;
-                }
-                else if (e.hasMetaData()) {
-                    Resource metaAnon = templategraph.createResource();
-                    createPredicate(tempAnonNode, "http://umkc.edu/attributeWithMeta", metaAnon);
-                    writeMetaNodes(e, metaAnon);
-                } else {
-                    createPredicate(tempAnonNode, "http://umkc.edu/attribute", e.getResource());
-                }
+//                if (e.isMetaEntity()) {
+//                    continue;
+//                }
+//                else if (e.hasMetaData()) {
+//                    Resource metaAnon = templategraph.createResource();
+//                    createPredicate(tempAnonNode, "http://umkc.edu/attributeWithMeta", metaAnon);
+//                    writeMetaNodes(e, metaAnon);
+//                } else {
+                createPredicate(tempAnonNode, "http://umkc.edu/attribute", e.getResource());
+//                }
             }
         }
         catch (Exception e) { e.printStackTrace();}
@@ -276,6 +305,4 @@ public class RDFTemplate {
 //        }
 
     }
-
-//    Boolean isEqual(RDFTemplate t2) {};
 }

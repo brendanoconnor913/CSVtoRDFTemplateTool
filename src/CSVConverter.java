@@ -108,7 +108,6 @@ public class CSVConverter {
         CSVConverter converter = new CSVConverter();
         Template2RDF templateToRDF = new Template2RDF(true);
         File inputtedFile = new File(fname);
-//        IdentityChecker ic = new IdentityChecker();
         TemplateHandler handler = new TemplateHandler(templategraph);
 
         File quads = new File("output-quads");
@@ -129,7 +128,6 @@ public class CSVConverter {
                 templateToRDF.run("output-templates/"+fileroot+"-template.nt", f.toString(), outtrips, subcols);
                 String outquads = "output-quads/"+fileroot+"-quads.nq";
                 converter.tripToQuad(outtrips,outquads,url);
-                // ic.addRelations(outquads, "output-quads/identity-quads.nq");
             }
         }
         else { // inputtedFile = single input file
@@ -143,7 +141,6 @@ public class CSVConverter {
             templateToRDF.run("output-templates/"+fileroot+"-template.nt", fname, outtrips, subcols);
             String outquads = "output-quads/"+fileroot+"-quads.nq";
             converter.tripToQuad(outtrips,outquads,url);
-            // ic.addRelations(outquads, "output-quads/identity-quads.nq");
         }
     }
 }

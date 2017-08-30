@@ -1,14 +1,19 @@
 import dnl.utils.text.table.TextTable;
 import org.apache.commons.csv.CSVFormat;
 import org.apache.commons.csv.CSVRecord;
-import org.apache.jena.rdf.model.Model;
-import org.apache.jena.rdf.model.ModelFactory;
-import org.apache.jena.rdf.model.Resource;
-import org.apache.jena.rdf.model.ResourceFactory;
+import org.apache.jena.query.QueryExecution;
+import org.apache.jena.query.QueryExecutionFactory;
+import org.apache.jena.query.QuerySolution;
+import org.apache.jena.query.ResultSet;
+import org.apache.jena.rdf.model.*;
 
 import java.io.*;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Vector;
+
+import static org.apache.jena.enhanced.BuiltinPersonalities.model;
+import static org.apache.jena.sparql.vocabulary.VocabTestQuery.query;
 
 /**
  * Created by brendan on 8/13/17.
@@ -21,11 +26,92 @@ public class TemplateHandler {
         templateGraph = graph; // file path to template graph
     }
 
-    //TODO: implement saving the graph template then move to searching graph for existing templates
     // search for template and if found save to file and update template graph
-    boolean templateFound(Vector<Entity> header, String filepath) {
+    // current default behavior to use any complete subject found, may want to modify down the line
+    boolean templateFound(Vector<Entity> header, String templatefilepath) {
+        // create a map from each template node to the entities in header that appear in its subject
+        HashMap<Resource, Vector<Entity>> tempToEntities = new HashMap<Resource, Vector<Entity>>();
+        Model templatemodel = ModelFactory.createDefaultModel();
+        templatemodel.read(templateGraph);
+
+        for (Entity e : header) {
+            String query = "SELECT ?s WHERE { ?s <http://umkc.edu/subject> <"+e.toString()+"> . }";
+            QueryExecution qexec = QueryExecutionFactory.create(query, templatemodel);
+            ResultSet result = qexec.execSelect();
+            while (result.hasNext()) {
+                QuerySolution soln = result.nextSolution();
+                Resource s = soln.getResource("s");
+                if (tempToEntities.containsKey(s)) {
+                    tempToEntities.get(s).add(e);
+                }
+                else {
+                    Vector<Entity> v = new Vector<Entity>();
+                    v.add(e);
+                    tempToEntities.put(s, v);
+                }
+            }
+        }
+
+        // filter out all nodes in which the entire subject isn't contained in the header
+        //      (subject size != map val size)
+        Vector<RDFTemplate> templates = new Vector<RDFTemplate>();
+        for (Resource node : tempToEntities.keySet()) {
+            StmtIterator itr = node.listProperties(templatemodel.getProperty("http://umkc.edu/subject"));
+            Integer subjectSize = itr.toList().size();
+            if (tempToEntities.get(node).size() == subjectSize) {
+                templates.add(new RDFTemplate(node, templateGraph));
+            }
+        }
+
+        if (templates.isEmpty()) {return false;}
+        // attempt to find exact match of entities in header and template
+        for (RDFTemplate t : templates) {
+            // if found use template
+            if (t.sameEntities(header)) {
+                t.writeToTemplateFile(templatefilepath);
+                t.writeToTemplateGraph();
+                return true;
+            }
+        }
+
+        // get biggest subject(s)
+        Vector<RDFTemplate> maxSubject = new Vector<RDFTemplate>();
+        for (RDFTemplate t : templates) {
+            if (maxSubject.isEmpty()) {
+                maxSubject.add(t);
+            }
+            else if (t.getSubjectSize().equals(maxSubject.get(0).getSubjectSize())) {
+                maxSubject.add(t);
+            }
+            else if (t.getSubjectSize() > maxSubject.get(0).getSubjectSize()) {
+                maxSubject = new Vector<RDFTemplate>();
+                maxSubject.add(t);
+            }
+        }
+        // for now just take one of the max subjects, ideally take one with  most overlapping attributes
+        // TODO: still need to handle meta relationships
+        if (!maxSubject.isEmpty()) {
+            Vector<Entity> maxsubj = maxSubject.get(0).getTemplateSubject();
+            Vector<Entity> attributes = new Vector<Entity>();
+            for (Entity e : header) {
+                if (!maxsubj.contains(e)) {
+                    attributes.add(e);
+                }
+            }
+            RDFTemplate template = new RDFTemplate(maxsubj, attributes, templateGraph);
+            template.writeToTemplateFile(templatefilepath);
+            template.writeToTemplateGraph();
+            return true;
+        }
         return false;
     }
+
+//    Vector<Entity> predictSubject() {};
+//    Vector<Entity> predictMetaRelationships(Vector<Entity> attributes) {};
+
+//    RDFTemplate predictTemplate(Vector<Entity> header) {
+//        return pTemplate;
+//    }
 
     private void printTable(String filepath) {
         final int ROWS = 17;
@@ -134,6 +220,17 @@ public class TemplateHandler {
         return subjectcols;
     }
 
+    // TODO: Fill in function to write
+    public void writeTemplatePredictionResults(RDFTemplate prediction, RDFTemplate usedtemplate) {
+        if (prediction.equals(usedtemplate)) {
+            // write correct prediction
+        }
+        else {
+            // write each template to file
+            // attach with node and prediction/used relationships
+        }
+    }
+
 
     // writes template for csv file to template file and saves template structure
     public Vector<Integer> createTemplateFile(String dirname, String filename, String ontologyGraph) {
@@ -148,17 +245,18 @@ public class TemplateHandler {
             Vector<Entity> aData = eh.addDataType(dataRow, eh.findEntities(fmtheader, dataRow, rawheader));
 
             // If previous template not found and used, then ask user for template structure
-            if (!templateFound(aData, filepath)) {
-                Vector<Entity> aMeta = getMetaRelationships(fmtheader, aData, dataRow);
+            if (!templateFound(aData, filename)) {
+//                RDFTemplate predictedTemp = predictTemplate(aData);
+//                Vector<Entity> aMeta = getMetaRelationships(fmtheader, aData, dataRow);
                 Vector<Entity> subject = new Vector<Entity>();
                 Vector<Entity> attributes = new Vector<Entity>();
                 subjectIndicies = getSubjectIndicies(filepath);
-                for(Integer i = 0; i < aMeta.size(); i++) {
+                for(Integer i = 0; i < aData.size(); i++) {
                     if (subjectIndicies.contains(i)) {
-                        subject.add(aMeta.get(i));
+                        subject.add(aData.get(i));
                     }
                     else {
-                        attributes.add(aMeta.get(i));
+                        attributes.add(aData.get(i));
                     }
                 }
 

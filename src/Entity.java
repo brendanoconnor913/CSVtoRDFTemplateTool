@@ -33,6 +33,7 @@ public class Entity {
 
     public String   toString() {return resource.toString();}
     public String   getCSVAlias() {return csvAlias;}
+    public void     addCSVAlias(String alias) {csvAlias = alias;}
     public void     addMeta(Entity metaEnt) {
         metaEnt.setMetaEntity();
         metadata.addElement(metaEnt);
@@ -45,6 +46,7 @@ public class Entity {
     public Boolean  hasMetaData() {
         return !metadata.isEmpty();
     }
+    // Down the line equality will need to search entity resolution graph to see if same entity
     public Boolean  equals(Entity a2) {
         return resource.equals(a2.resource);
     }
