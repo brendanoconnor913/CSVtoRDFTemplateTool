@@ -10,6 +10,7 @@ import org.apache.jena.query.QueryExecutionFactory;
 import org.apache.jena.query.QuerySolution;
 import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.*;
+import org.apache.jena.update.UpdateAction;
 
 /**
  * Created by brendan on 8/17/17.
@@ -207,9 +208,13 @@ public class RDFTemplate {
 
     public void writeToTemplateGraph() {
         if (!newTemplate) {
-            templatenode.removeAll(templategraph.getProperty("http://umkc.edu/numObservations"));
-            createTriple(templatenode,"http://umkc.edu/numObservations", Integer.toString(observations+1));
-            writeToModel();
+            StmtIterator itr = templatenode.listProperties();
+            while(itr.hasNext()) {
+                Statement s = itr.nextStatement();
+//                templategraph.;
+            }
+            observations += 1;
+            createTriple(templatenode,"http://umkc.edu/numObservations", Integer.toString(observations));
             return;
         }
 

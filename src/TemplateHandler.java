@@ -89,7 +89,6 @@ public class TemplateHandler {
             }
         }
         // for now just take one of the max subjects, ideally take one with  most overlapping attributes
-        // TODO: still need to handle meta relationships
         if (!maxSubject.isEmpty()) {
             Vector<Entity> maxsubj = maxSubject.get(0).getTemplateSubject();
             Vector<Entity> attributes = new Vector<Entity>();
