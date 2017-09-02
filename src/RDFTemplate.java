@@ -1,24 +1,19 @@
 import java.io.*;
 import java.util.HashSet;
 import java.util.Vector;
-
-import dnl.utils.text.table.TextTable;
-import org.apache.commons.csv.CSVFormat;
-import org.apache.commons.csv.CSVRecord;
-import org.apache.jena.query.QueryExecution;
-import org.apache.jena.query.QueryExecutionFactory;
-import org.apache.jena.query.QuerySolution;
-import org.apache.jena.query.ResultSet;
 import org.apache.jena.rdf.model.*;
-import org.apache.jena.update.UpdateAction;
 
 /**
  * Created by brendan on 8/17/17.
  */
 
+// class to simplify creating and saving of templates used for conversion
 public class RDFTemplate {
+    // entities used in subject
     private Vector<Entity> subject = new Vector<Entity>();
+    // entities used to provide information on attribute
     private Vector<Entity> attributes = new Vector<Entity>();
+    // number of times the template is observed
     private Integer observations;
     private Model templategraph  = ModelFactory.createDefaultModel();
     private String graphname;
@@ -51,6 +46,7 @@ public class RDFTemplate {
         newTemplate = true;
     }
 
+    // write model to file
     private void writeToModel() {
         try {
             PrintWriter pw = new PrintWriter(graphname);
@@ -69,11 +65,13 @@ public class RDFTemplate {
         writeToModel();
     }
 
+    // creates a predicate between two resources
     private void createPredicate(Resource s, String predicate, Resource o){
         s.addProperty(ResourceFactory.createProperty(predicate), o);
         writeToModel();
     }
 
+    // gets the number of observations for a template
     private Integer getObservations(Resource tempnode) throws Exception {
         // each template should only have one observation node
         StmtIterator itr = tempnode.listProperties(templategraph.getProperty("http://umkc.edu/numObservations"));
@@ -85,6 +83,7 @@ public class RDFTemplate {
 
     Vector<Entity> getTemplateSubject() {return subject;}
 
+    // Function to determine if current template has the same entities as a csv header
     Boolean sameEntities(Vector<Entity> header) {
         HashSet<String> allEntities = new HashSet<String>();
         Vector<Entity> newSub = new Vector<Entity>();
@@ -118,6 +117,7 @@ public class RDFTemplate {
         return same;
     }
 
+    // get object for a given node and predicate
     private Vector<Entity> getResults(Resource basenode, String pred) {
         Vector<Entity> outresults = new Vector<Entity>();
         StmtIterator itr = basenode.listProperties(templategraph.getProperty(pred));
@@ -128,6 +128,7 @@ public class RDFTemplate {
         return outresults;
     }
 
+    // gets the subject from a template node
     private Vector<Entity> getSubject(Resource tempnode) throws Exception {
         Vector<Entity> tsubject = getResults(tempnode, "http://umkc.edu/subject");
         if (tsubject.isEmpty()) {throw new Exception("No subject found");}
@@ -161,6 +162,7 @@ public class RDFTemplate {
         return valueAttribute;
     }
 
+    // gets the attribute entities from the template
     private Vector<Entity> getAttributes(Resource tempnode) throws Exception {
         Vector<Entity> tAttributes = new Vector<Entity>();
         StmtIterator itr = tempnode.listProperties(templategraph.getProperty("http://umkc.edu/attribute"));
@@ -206,6 +208,7 @@ public class RDFTemplate {
         return accstring.toString();
     }
 
+    // Writes the current template to the template graph
     public void writeToTemplateGraph() {
         if (!newTemplate) {
             StmtIterator itr = templatenode.listProperties();
@@ -242,9 +245,11 @@ public class RDFTemplate {
         writeToModel();
     }
 
+    // writes the template to a triple template file
     public void writeToTemplateFile(String templatefile) {
         try {
             StringBuilder subjectbuilder = new StringBuilder();
+            // create the subject
             subjectbuilder.append("<http://umkc.edu/subject/");
             for (Entity e : subject) {
                 subjectbuilder.append("${" + e.getCSVAlias() + "}" + "-");
@@ -252,6 +257,7 @@ public class RDFTemplate {
             subjectbuilder.deleteCharAt(subjectbuilder.length() - 1); // final subject string
             subjectbuilder.append(">");
 
+            // write the entities the subject is composed of
             StringBuilder template = new StringBuilder();
             final String MADEOF = "<http://umkc.edu/composedOf>";
             if (subject.size() > 1) {
@@ -263,6 +269,7 @@ public class RDFTemplate {
             }
 
             final String subjectnode = "_:subject";
+            // add all of the attributes to the grouped record
             final String GROUPEDREC = "<http://umkc.edu/groupedRecord>";
             template.append(subjectbuilder.toString() + " " + GROUPEDREC + " " + subjectnode + " . \n");
 

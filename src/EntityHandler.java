@@ -12,6 +12,7 @@ import java.util.Vector;
 /**
  * Created by brendan on 10/30/16.
  */
+// class to extract entities from csv file and helper functions for creating entities
 public class EntityHandler {
     private Model ontologygraph = ModelFactory.createDefaultModel();
     private String graphname;
@@ -153,52 +154,6 @@ public class EntityHandler {
         }
         return entities;
     }
-
-    // function to get name of unit if measurement indentified for entity
-//    public Vector<Entity> getUnits(Vector<String> header,
-//                                      Vector<Entity> entities,
-//                                      Vector<String> firstrow) {
-////        final String UNIT = "http://umkc.edu/unit";
-//        Vector<Entity> attrsWithUnits = new Vector<Entity>(entities.size());
-//        try {
-//            Vector<Entity> tmp = checkDependency(header, entities, firstrow);
-//            for(int i = 0; i < tmp.size(); i++) {
-//                Entity e = tmp.get(i);
-////                if(!a.isMeta && !a.hasMetaData()) {
-//                String query = "SELECT ?x WHERE { "+"<"+e.toString()+">"+" <http://umkc.edu/unit> ?x .}";
-//                QueryExecution qexec = QueryExecutionFactory.create(query, ontologygraph);
-//                ResultSet results = qexec.execSelect();
-////                    if (!results.hasNext()) {
-//////                        Boolean measurement = isResourceAMeasurement(a.resource);
-////                        if(measurement) { // Gets unit from user, adds to graph and entity
-////                            System.out.println("\n" + header.get(i) + " has been identified as a measurement.");
-////                            System.out.print("Please enter the unit name (input NA if not a measurement): ");
-////                            Scanner s = new Scanner(System.in);
-////                            if (!s.nextLine().equals("NA")) {
-////                                String unit = formatEntity(s.nextLine().trim());
-////                                createTriple(a.resource, UNIT, unit);
-////                                a.metadata.put(UNIT, unit);
-////                            }
-////                        }
-////                    }
-////                    else {
-//                // TODO: Expand this to let user choose which literal if multi results returned
-//                if (results.hasNext()) {
-//                    QuerySolution solution = results.nextSolution();
-//                    Literal unitlit = solution.getLiteral("x");
-//                    String unitstr = unitlit.toString();
-//                    e.unit = unitstr;
-//                }
-////                    }
-//                System.out.print("Col " + i + " processed\n");
-//                attrsWithUnits.add(e);
-//            }
-//        }
-//        catch(Exception e) {
-//            e.printStackTrace();
-//        }
-//        return attrsWithUnits;
-//    }
 
     // helper function to determine if string contains boolean values
     public boolean isBool(String s) {

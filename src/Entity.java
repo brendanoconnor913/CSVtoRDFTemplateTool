@@ -8,11 +8,12 @@ import java.util.Vector;
 /**
  * Created by brendan on 11/7/16.
  */
+// Class used to simplify handling of model entities
 public class Entity {
     private Resource resource;
     private Boolean isMeta;
     public String datatype;
-//    public String unit;
+    // column header string for the entity
     private String csvAlias;
 
     // If empty no metadata, all integers are column indicies of metdata for this attribute

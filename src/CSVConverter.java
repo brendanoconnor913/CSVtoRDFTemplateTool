@@ -11,8 +11,7 @@ import java.util.Vector;
  * Created by brendan on 10/9/16.
  */
 
-//TODO: Modify to seperately ask for units
-
+// Class that handles all high level operation on files
 public class CSVConverter {
     // function to return vector containing header for each column
     static String stripFileExtension(String filename) {
@@ -24,6 +23,7 @@ public class CSVConverter {
         return ns.toString();
     }
 
+    // formats the strings of the header
     static Vector<String> getFormattedHeader(String fname) {
         Vector<String> header = new Vector<String>();
         try {
@@ -43,6 +43,7 @@ public class CSVConverter {
         return header;
     }
 
+    // returns a vector of each column header string
     static Vector<String> getHeader(String fname) {
         Vector<String> header = new Vector<String>();
         try {
@@ -80,6 +81,7 @@ public class CSVConverter {
         return dRow;
     }
 
+    // converts a nt triples file to quad file
     public void tripToQuad(String triplesfile, String outputfile, String contexturl) {
         System.out.println("Adding context to triples ...");
         try {
@@ -102,6 +104,7 @@ public class CSVConverter {
     }
 
     public static void main(String args[]) {
+        // get initial input files
         String fname = args[0];
         String ontologygraph = args[1];
         String templategraph = args[2];
@@ -110,22 +113,27 @@ public class CSVConverter {
         File inputtedFile = new File(fname);
         TemplateHandler handler = new TemplateHandler(templategraph);
 
+        // make sure output file exists
         File quads = new File("output-quads");
         if (!quads.exists()) {
             quads.mkdir();
         }
 
+        // check if data input is a directory
         if(inputtedFile.isDirectory()) {
             File[] files = inputtedFile.listFiles();
             for(File f : files) {
-//                String filepath = inputtedFile.getAbsolutePath()+"/"+f.getName();
                 String fileroot = stripFileExtension(f.getName());
+                // make template for conversion
                 List<Integer> subcols = handler.createTemplateFile(inputtedFile.getAbsolutePath(), f.getName(), ontologygraph);
                 Scanner scan = new Scanner(System.in);
+                // get quad context
                 System.out.print("Please give the url source for " + f.getName() + ": ");
                 String url = scan.nextLine().trim();
                 String outtrips = "output-triples/"+fileroot+"-triples.nt";
+                // convert template to triples
                 templateToRDF.run("output-templates/"+fileroot+"-template.nt", f.toString(), outtrips, subcols);
+                // add context
                 String outquads = "output-quads/"+fileroot+"-quads.nq";
                 converter.tripToQuad(outtrips,outquads,url);
             }

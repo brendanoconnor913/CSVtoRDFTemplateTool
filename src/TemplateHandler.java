@@ -9,16 +9,13 @@ import org.apache.jena.rdf.model.*;
 
 import java.io.*;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Vector;
-
-import static org.apache.jena.enhanced.BuiltinPersonalities.model;
-import static org.apache.jena.sparql.vocabulary.VocabTestQuery.query;
 
 /**
  * Created by brendan on 8/13/17.
  */
 
+// Class to help with the creation of templates
 public class TemplateHandler {
     private String templateGraph;
 
@@ -186,6 +183,7 @@ public class TemplateHandler {
         return dEntities;
     }
 
+    // get the indicies of the columns used as a subject
     Vector<Integer> getSubjectIndicies(String filepath) {
         Vector<Integer> subjectcols = new Vector<Integer>();
         try {
