@@ -301,20 +301,4 @@ public class RDFTemplate {
         }
         catch (Exception e) { e.printStackTrace();}
     }
-
-    public static void main(String args[]) {
-//        Model model = ModelFactory.createDefaultModel();
-//        model.read("templates.nt");
-//        String query;
-//        query = "SELECT ?s ?x WHERE { ?s <http://umkc.edu/numObservations> ?x . }";
-//        QueryExecution qexec = QueryExecutionFactory.create(query, model);
-//        ResultSet result = qexec.execSelect();
-//        while (result.hasNext()) {
-//            System.out.println("new temp");
-//            QuerySolution soln = result.nextSolution();
-//            Resource s = soln.getResource("s");
-//            new RDFTemplate(s, "templates.nt");
-//        }
-
-    }
 }
